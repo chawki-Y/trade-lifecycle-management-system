@@ -18,14 +18,17 @@ This project was built to demonstrate backend API development, SQL/database desi
 - View a Market Overview watchlist for all active instruments
 - Refresh selected instrument market price on demand
 - Refresh trade P&L and market prices on demand
+- Track simplified trade lifecycle statuses: NEW, VALIDATED, BOOKED, REJECTED
+- Store audit logs for trade, market data, and P&L events
+- View full trade details from the Latest Trades table
 - Validate trade input data
 - Validate submitted instruments against backend reference data
 - Calculate P&L for BUY and SELL trades
-- Recalculate valid trade P&L when trades are refreshed
+- Recalculate booked trade P&L when trades are refreshed
 - Cache market prices for 60 seconds to reduce free API usage
 - Store trade records in PostgreSQL
 - Display trade history
-- Show reporting dashboard with total trades, valid trades, rejected trades, and total P&L
+- Show reporting dashboard with total trades, booked trades, rejected trades, and total P&L
 - Responsive frontend for laptop and mobile
 
 ## Tech Stack
@@ -58,12 +61,20 @@ TRD-YYYYMMDD-000001
 
 Returns all saved trades.
 
+Booked trades are refreshed with latest available market prices and recalculated P&L before being returned.
+
+### GET `/api/trades/:tradeId`
+
+Returns one trade by its generated trade ID.
+
+If the trade does not exist, the API returns `404` with a clean message.
+
 ### GET `/api/trades/report`
 
 Returns trade reporting metrics:
 
 - Total trades
-- Valid trades
+- Booked trades
 - Rejected trades
 - Total P&L
 
@@ -86,6 +97,7 @@ Example:
   "source": "twelvedata",
   "timestamp": "2026-06-21T12:00:00.000Z",
   "checkedAt": "2026-06-21T12:00:05.000Z",
+  "cacheAgeSeconds": 0,
   "fromCache": false,
   "stale": false
 }
@@ -110,10 +122,72 @@ Example:
     "lastUpdated": "2026-06-21T12:45:03.000Z",
     "source": "twelvedata",
     "fromCache": true,
+    "cacheAgeSeconds": 43,
     "stale": false
   }
 ]
 ```
+
+### GET `/api/audit-logs`
+
+Returns the latest 50 audit events ordered by newest first.
+
+Example:
+
+```json
+[
+  {
+    "eventType": "TRADE_BOOKED",
+    "entityType": "TRADE",
+    "entityId": "TRD-20260621-000006",
+    "description": "Trade TRD-20260621-000006 passed validation and was booked.",
+    "createdAt": "2026-06-21T12:48:00.000Z"
+  }
+]
+```
+
+## Trade Lifecycle
+
+The project uses a simplified lifecycle to make trade processing more realistic:
+
+- `NEW`: trade request has been submitted.
+- `VALIDATED`: trade passed business validation.
+- `BOOKED`: trade was successfully stored as an accepted trade.
+- `REJECTED`: trade failed validation or could not be accepted.
+
+For simplicity, the database stores the final status. Accepted trades are stored as `BOOKED`, and failed trades are stored as `REJECTED`. Audit logs record the important workflow events around capture, rejection, booking, market refresh, and P&L recalculation.
+
+## Audit Trail
+
+The Audit Trail section shows recent operational events, such as:
+
+- `TRADE_CREATED`
+- `TRADE_VALIDATED`
+- `TRADE_REJECTED`
+- `TRADE_BOOKED`
+- `MARKET_PRICE_REFRESHED`
+- `MARKET_OVERVIEW_REFRESHED`
+- `PNL_RECALCULATED`
+
+Audit logging is intentionally non-blocking. If writing an audit event fails, the server logs a warning but does not crash the main trade or market data workflow.
+
+## Trade Detail View
+
+Each row in the Latest Trades table has a View button. It opens a simple detail modal showing the full trade record:
+
+- Trade ID
+- Instrument
+- Trade type
+- Quantity
+- Trade price
+- Market price
+- P&L
+- Status
+- Rejection reason
+- Market data source
+- Last price updated time
+- Trade date
+- Created time
 
 ## Live Market Data
 
@@ -128,9 +202,11 @@ The dashboard behaves like a simplified trading workstation:
 - The user can click Refresh Market Price to refresh only the selected instrument.
 - The user can click Refresh Trade P&L to refresh stored trade prices and recalculate P&L.
 - When a trade is submitted, the backend fetches the latest available market price and uses it to calculate P&L.
-- When `GET /api/trades` is called, valid trades attempt to refresh their market price and recalculate P&L.
+- When `GET /api/trades` is called, booked trades attempt to refresh their market price and recalculate P&L.
 
 Market prices are cached server-side to reduce free API usage and avoid unnecessary provider calls.
+
+## Market Data Cache
 
 Cache behavior:
 
@@ -138,6 +214,7 @@ Cache behavior:
 - FX pairs and commodities use a 120-second cache.
 - Price refreshes are user-triggered, and repeated backend requests reuse cached prices while the cache is valid.
 - `timestamp` shows when the quote was last fetched from the provider. `checkedAt` shows when the backend last checked for a price, so it changes on every frontend refresh even when the quote comes from cache.
+- `cacheAgeSeconds` shows how old a cached price is, which gives users transparency when a price comes from cache.
 - If the provider fails and a stale cached price exists, the backend returns the stale cached price instead of crashing.
 - When refreshing the trades table, the backend fetches one price per unique instrument and reuses it for all trades with that instrument.
 
@@ -156,11 +233,13 @@ The Market Overview simulates a simplified market watchlist found in financial p
 
 For GitHub presentation, add screenshots that show:
 
-- Dashboard summary with total trades, valid trades, rejected trades, and total P&L
+- Dashboard summary with total trades, booked trades, rejected trades, and total P&L
 - Live market price card for a selected instrument
 - Market Overview watchlist showing all active instruments and cached/API price source labels
 - Capture Trade form with the instrument dropdown loaded from PostgreSQL
-- Latest Trades table showing generated trade IDs, refreshed market prices, status, and P&L
+- Latest Trades table showing generated trade IDs, refreshed market prices, status, View button, and P&L
+- Trade detail modal
+- Audit Trail section
 
 ## P&L Formula
 
@@ -188,16 +267,19 @@ trade-processing-system/
 |   |-- config/
 |   |   `-- db.js
 |   |-- controllers/
+|   |   |-- auditLogController.js
 |   |   |-- instrumentController.js
 |   |   |-- marketDataController.js
 |   |   |-- marketOverviewController.js
 |   |   `-- tradeController.js
 |   |-- routes/
+|   |   |-- auditLogRoutes.js
 |   |   |-- instrumentRoutes.js
 |   |   |-- marketDataRoutes.js
 |   |   |-- marketOverviewRoutes.js
 |   |   `-- tradeRoutes.js
 |   |-- services/
+|   |   |-- auditLogService.js
 |   |   |-- marketDataService.js
 |   |   |-- pnlService.js
 |   |   `-- validationService.js
@@ -208,3 +290,14 @@ trade-processing-system/
 |-- .gitignore
 `-- README.md
 ```
+
+## Future Improvements
+
+- Authentication and role-based access
+- More complete trade lifecycle transitions
+- Trade amendment and cancellation
+- CSV trade import
+- Unit and integration tests
+- Database migrations
+- Position tracking by instrument
+- Deployment to a cloud environment

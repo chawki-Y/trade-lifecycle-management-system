@@ -2,11 +2,17 @@ const tradeForm = document.querySelector("#tradeForm");
 const refreshButton = document.querySelector("#refreshButton");
 const refreshMarketPriceButton = document.querySelector("#refreshMarketPriceButton");
 const refreshMarketOverviewButton = document.querySelector("#refreshMarketOverviewButton");
+const refreshAuditButton = document.querySelector("#refreshAuditButton");
 const formMessage = document.querySelector("#formMessage");
 const tradesTable = document.querySelector("#tradesTable");
 const tradeCount = document.querySelector("#tradeCount");
 const marketOverviewTable = document.querySelector("#marketOverviewTable");
 const marketOverviewStatus = document.querySelector("#marketOverviewStatus");
+const auditTable = document.querySelector("#auditTable");
+const auditStatus = document.querySelector("#auditStatus");
+const tradeDetailModal = document.querySelector("#tradeDetailModal");
+const tradeDetailContent = document.querySelector("#tradeDetailContent");
+const closeTradeDetailButton = document.querySelector("#closeTradeDetailButton");
 const instrumentSelect = document.querySelector("#instrument");
 const submitButton = tradeForm.querySelector("button[type='submit']");
 const selectedInstrumentLabel = document.querySelector("#selectedInstrumentLabel");
@@ -64,6 +70,14 @@ function formatTime(value) {
   return new Date(value).toLocaleTimeString();
 }
 
+function formatDateTime(value) {
+  if (!value) {
+    return "-";
+  }
+
+  return new Date(value).toLocaleString();
+}
+
 function formatSource(source) {
   if (!source || source === "Unavailable") {
     return source || "-";
@@ -74,6 +88,16 @@ function formatSource(source) {
   }
 
   return source;
+}
+
+function formatCacheAge(ageSeconds) {
+  const age = Number(ageSeconds);
+
+  if (!Number.isFinite(age)) {
+    return "";
+  }
+
+  return ` Age: ${age}s`;
 }
 
 function setMarketPriceState({ symbol = "-", price = null, timestamp = null, checkedAt = null, status = "" }) {
@@ -119,6 +143,7 @@ async function loadMarketOverview() {
     marketOverviewTable.innerHTML = overview.map((instrument) => {
       const sourceLabel = instrument.marketPrice === null ? "Unavailable" : instrument.fromCache ? "Cache" : "API";
       const sourceClass = instrument.marketPrice === null ? "unavailable" : instrument.fromCache ? "cache" : "api";
+      const cacheAge = instrument.fromCache ? formatCacheAge(instrument.cacheAgeSeconds) : "";
       const price = instrument.marketPrice === null ? "Unavailable" : formatMarketPrice(instrument.marketPrice);
       const updatedAt = formatTime(instrument.lastUpdated);
 
@@ -132,7 +157,7 @@ async function loadMarketOverview() {
           <td>${updatedAt}</td>
           <td>
             <span>${formatSource(instrument.source)}</span>
-            <span class="source-pill ${sourceClass}">Source: ${sourceLabel}</span>
+            <span class="source-pill ${sourceClass}">Source: ${sourceLabel}${cacheAge}</span>
           </td>
         </tr>
       `;
@@ -144,6 +169,37 @@ async function loadMarketOverview() {
     marketOverviewTable.innerHTML = `<tr><td class="empty-row" colspan="7">${error.message}</td></tr>`;
   } finally {
     refreshMarketOverviewButton.disabled = false;
+  }
+}
+
+async function loadAuditLogs() {
+  auditStatus.textContent = "Loading audit logs...";
+  refreshAuditButton.disabled = true;
+
+  try {
+    const logs = await fetchJson("/api/audit-logs");
+
+    if (!logs.length) {
+      auditTable.innerHTML = `<tr><td class="empty-row" colspan="4">No audit events yet.</td></tr>`;
+      auditStatus.textContent = "No audit events";
+      return;
+    }
+
+    auditTable.innerHTML = logs.map((log) => `
+      <tr>
+        <td>${formatDateTime(log.createdAt)}</td>
+        <td>${log.eventType}</td>
+        <td>${log.entityType}${log.entityId ? ` / ${log.entityId}` : ""}</td>
+        <td>${log.description}</td>
+      </tr>
+    `).join("");
+
+    auditStatus.textContent = `Showing latest ${logs.length} event${logs.length === 1 ? "" : "s"}`;
+  } catch (error) {
+    auditStatus.textContent = "Audit trail unavailable";
+    auditTable.innerHTML = `<tr><td class="empty-row" colspan="4">${error.message}</td></tr>`;
+  } finally {
+    refreshAuditButton.disabled = false;
   }
 }
 
@@ -194,7 +250,9 @@ async function loadMarketPrice(symbol) {
       price: marketData.marketPrice,
       timestamp: marketData.timestamp,
       checkedAt: marketData.checkedAt,
-      status: marketData.fromCache ? "Price source: Cache" : "Price source: API"
+      status: marketData.fromCache
+        ? `Price source: Cache${formatCacheAge(marketData.cacheAgeSeconds)}`
+        : "Price source: API"
     });
 
     submitButton.disabled = false;
@@ -218,7 +276,7 @@ async function loadTrades() {
   tradeCount.textContent = `${trades.length} ${trades.length === 1 ? "row" : "rows"}`;
 
   if (!trades.length) {
-    tradesTable.innerHTML = `<tr><td class="empty-row" colspan="8">No trades captured yet.</td></tr>`;
+    tradesTable.innerHTML = `<tr><td class="empty-row" colspan="9">No trades captured yet.</td></tr>`;
     return;
   }
 
@@ -235,6 +293,7 @@ async function loadTrades() {
         <td>${formatNumber(trade.MarketPrice)}</td>
         <td>${formatNumber(trade.PnL)}</td>
         <td><span class="status ${status}">${trade.Status}</span></td>
+        <td><button class="table-button" type="button" data-trade-id="${trade.TradeId}">View</button></td>
       </tr>
     `;
   }).join("");
@@ -244,11 +303,53 @@ async function refreshDashboard() {
   await loadMarketOverview();
   await loadTrades();
   await loadReport();
+  await loadAuditLogs();
 }
 
 async function refreshTradePnl() {
   await loadTrades();
   await loadReport();
+  await loadAuditLogs();
+}
+
+function openTradeDetail(trade) {
+  const fields = [
+    ["Trade ID", trade.TradeId],
+    ["Instrument", trade.Instrument],
+    ["Trade Type", trade.TradeType],
+    ["Quantity", formatNumber(trade.Quantity)],
+    ["Trade Price", formatNumber(trade.TradePrice)],
+    ["Market Price", formatNumber(trade.MarketPrice)],
+    ["P&L", formatNumber(trade.PnL)],
+    ["Status", trade.Status],
+    ["Rejection Reason", trade.RejectionReason || "-"],
+    ["Market Data Source", formatSource(trade.MarketDataSource)],
+    ["Last Price Updated At", formatDateTime(trade.LastPriceUpdatedAt)],
+    ["Trade Date", formatDateTime(trade.TradeDate)],
+    ["Created At", formatDateTime(trade.CreatedAt)]
+  ];
+
+  tradeDetailContent.innerHTML = fields.map(([label, value]) => `
+    <div>
+      <span>${label}</span>
+      <strong>${value ?? "-"}</strong>
+    </div>
+  `).join("");
+  tradeDetailModal.hidden = false;
+}
+
+function closeTradeDetail() {
+  tradeDetailModal.hidden = true;
+  tradeDetailContent.innerHTML = "";
+}
+
+async function loadTradeDetail(tradeId) {
+  try {
+    const trade = await fetchJson(`/api/trades/${encodeURIComponent(tradeId)}`);
+    openTradeDetail(trade);
+  } catch (error) {
+    setMessage(error.message, "error");
+  }
 }
 
 tradeForm.addEventListener("submit", async (event) => {
@@ -285,11 +386,11 @@ tradeForm.addEventListener("submit", async (event) => {
       body: JSON.stringify(payload)
     });
 
-    const resultMessage = result.status === "VALID"
-      ? `Trade ${result.tradeId} processed successfully.`
-      : `Trade rejected: ${result.rejectionReason || result.message}`;
+    const resultMessage = result.status === "BOOKED"
+        ? `Trade ${result.tradeId} booked successfully.`
+        : `Trade rejected: ${result.rejectionReason || result.message}`;
 
-    setMessage(resultMessage, result.status === "VALID" ? "success" : "error");
+    setMessage(resultMessage, result.status === "BOOKED" ? "success" : "error");
     tradeForm.reset();
     document.querySelector("#tradeDate").valueAsDate = new Date();
     latestMarketPrice = null;
@@ -319,10 +420,33 @@ refreshMarketPriceButton.addEventListener("click", async () => {
   }
 
   await loadMarketPrice(instrumentSelect.value);
+  await loadAuditLogs();
 });
 
 refreshMarketOverviewButton.addEventListener("click", async () => {
   await loadMarketOverview();
+  await loadAuditLogs();
+});
+
+refreshAuditButton.addEventListener("click", async () => {
+  await loadAuditLogs();
+});
+
+tradesTable.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-trade-id]");
+
+  if (!button) {
+    return;
+  }
+
+  await loadTradeDetail(button.dataset.tradeId);
+});
+
+closeTradeDetailButton.addEventListener("click", closeTradeDetail);
+tradeDetailModal.addEventListener("click", (event) => {
+  if (event.target.matches("[data-close-modal]")) {
+    closeTradeDetail();
+  }
 });
 
 instrumentSelect.addEventListener("change", async () => {

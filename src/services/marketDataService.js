@@ -56,6 +56,7 @@ function getCachedPrice(cacheKey, allowStale = false) {
     marketPrice: cached.price,
     source: cached.source,
     timestamp: cached.timestamp,
+    cacheAgeSeconds: Math.max(0, Math.floor((Date.now() - cached.cachedAt) / 1000)),
     fromCache: true,
     stale: isExpired
   };
@@ -67,6 +68,7 @@ function setCachedPrice(cacheKey, symbol, data) {
     price: data.marketPrice,
     source: data.source,
     timestamp: data.timestamp,
+    cachedAt: Date.now(),
     expiresAt: Date.now() + getCacheTtl(symbol)
   };
 }
@@ -135,6 +137,7 @@ async function getLatestMarketPrice(symbol) {
 
   return {
     ...data,
+    cacheAgeSeconds: 0,
     fromCache: false,
     stale: false
   };

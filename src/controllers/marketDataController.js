@@ -1,5 +1,6 @@
 const { pool } = require("../config/db");
 const { getLatestMarketPrice } = require("../services/marketDataService");
+const { createAuditLog } = require("../services/auditLogService");
 
 async function isActiveInstrument(symbol) {
   const result = await pool.query(
@@ -31,12 +32,20 @@ async function getMarketPrice(req, res) {
 
     const marketData = await getLatestMarketPrice(symbol);
 
+    await createAuditLog(
+      "MARKET_PRICE_REFRESHED",
+      "INSTRUMENT",
+      symbol,
+      `Market price checked for ${symbol} using ${marketData.fromCache ? "cache" : "API"}.`
+    );
+
     return res.json({
       symbol: marketData.symbol,
       marketPrice: marketData.marketPrice,
       source: marketData.source,
       timestamp: marketData.timestamp,
       checkedAt: new Date().toISOString(),
+      cacheAgeSeconds: marketData.cacheAgeSeconds,
       fromCache: marketData.fromCache,
       stale: marketData.stale
     });

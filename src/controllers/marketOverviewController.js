@@ -1,5 +1,6 @@
 const { pool } = require("../config/db");
 const { getLatestMarketPrice } = require("../services/marketDataService");
+const { createAuditLog } = require("../services/auditLogService");
 
 async function getActiveInstruments() {
   const result = await pool.query(`
@@ -25,6 +26,7 @@ async function buildMarketOverviewRow(instrument) {
       lastUpdated: marketData.timestamp,
       source: marketData.source,
       fromCache: marketData.fromCache,
+      cacheAgeSeconds: marketData.cacheAgeSeconds,
       stale: marketData.stale || false
     };
   } catch (error) {
@@ -47,6 +49,13 @@ async function getMarketOverview(req, res) {
   try {
     const instruments = await getActiveInstruments();
     const overview = await Promise.all(instruments.map(buildMarketOverviewRow));
+
+    await createAuditLog(
+      "MARKET_OVERVIEW_REFRESHED",
+      "MARKET_OVERVIEW",
+      null,
+      `Market overview refreshed for ${overview.length} active instrument(s).`
+    );
 
     return res.json(overview);
   } catch (error) {

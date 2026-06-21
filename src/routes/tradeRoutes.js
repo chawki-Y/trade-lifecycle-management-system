@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   createTrade,
+  getTradeByTradeId,
   getTrades,
   getTradeReport
 } = require("../controllers/tradeController");
@@ -11,5 +12,6 @@ const router = express.Router();
 router.post("/", createTrade);
 router.get("/", getTrades);
 router.get("/report", getTradeReport);
+router.get("/:tradeId", getTradeByTradeId);
 
 module.exports = router;

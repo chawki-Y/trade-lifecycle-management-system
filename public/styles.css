@@ -122,7 +122,8 @@ h2 {
   text-align: right;
 }
 
-#marketOverviewStatus {
+#marketOverviewStatus,
+#auditStatus {
   color: var(--muted);
   font-size: 14px;
   margin-top: 4px;
@@ -235,6 +236,14 @@ button:disabled {
   white-space: nowrap;
 }
 
+.table-button {
+  min-height: 30px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--text);
+  padding: 0 10px;
+}
+
 .table-wrap {
   width: 100%;
   max-width: 100%;
@@ -255,6 +264,10 @@ table {
 
 .market-overview-table {
   min-width: 1040px;
+}
+
+.audit-table {
+  min-width: 900px;
 }
 
 th,
@@ -308,6 +321,13 @@ td {
   color: #14532d;
 }
 
+.status.booked,
+.status.validated,
+.status.new {
+  background: #dcfce7;
+  color: #14532d;
+}
+
 .status.rejected {
   background: #fee4e2;
   color: #912018;
@@ -344,6 +364,65 @@ td {
   text-align: center;
 }
 
+.modal[hidden] {
+  display: none;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(31, 41, 51, 0.45);
+}
+
+.modal-card {
+  position: relative;
+  z-index: 1;
+  width: min(760px, 100%);
+  max-height: min(720px, 90vh);
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 20px 45px rgba(16, 24, 40, 0.22);
+  padding: 18px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.detail-grid div {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  padding: 12px;
+}
+
+.detail-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.detail-grid strong {
+  display: block;
+  font-size: 15px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 900px) {
   .summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -370,7 +449,8 @@ td {
 
   .summary,
   form,
-  .market-grid {
+  .market-grid,
+  .detail-grid {
     grid-template-columns: 1fr;
   }
 

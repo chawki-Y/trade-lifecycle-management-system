@@ -44,6 +44,15 @@ CREATE TABLE IF NOT EXISTS trades (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id SERIAL PRIMARY KEY,
+    event_type VARCHAR(100) NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
+    entity_id VARCHAR(100),
+    description TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 ALTER TABLE trades
 ADD COLUMN IF NOT EXISTS last_price_updated_at TIMESTAMP NULL;
 
@@ -53,6 +62,7 @@ ADD COLUMN IF NOT EXISTS market_data_source VARCHAR(50);
 -- Reset and seed demo trade data.
 -- This clears old local test trades but keeps the instrument reference data above.
 DELETE FROM trades;
+DELETE FROM audit_logs;
 
 ALTER SEQUENCE trade_id_sequence RESTART WITH 1;
 
@@ -71,10 +81,22 @@ INSERT INTO trades (
     market_data_source
 )
 VALUES
-    ('TRD-20260621-000001', 'EUR/USD', 'BUY', 100000.00, 1.0800, 1.0825, 250.0000, '2026-06-21', 'VALID', NULL, CURRENT_TIMESTAMP, 'seed'),
-    ('TRD-20260621-000002', 'AAPL', 'BUY', 50.00, 180.2500, 184.1000, 192.5000, '2026-06-21', 'VALID', NULL, CURRENT_TIMESTAMP, 'seed'),
-    ('TRD-20260621-000003', 'MSFT', 'SELL', 40.00, 410.7500, 407.5000, 130.0000, '2026-06-21', 'VALID', NULL, CURRENT_TIMESTAMP, 'seed'),
-    ('TRD-20260621-000004', 'XAU/USD', 'BUY', 10.00, 2320.0000, 2335.5000, 155.0000, '2026-06-21', 'VALID', NULL, CURRENT_TIMESTAMP, 'seed'),
+    ('TRD-20260621-000001', 'EUR/USD', 'BUY', 100000.00, 1.0800, 1.0825, 250.0000, '2026-06-21', 'BOOKED', NULL, CURRENT_TIMESTAMP, 'seed'),
+    ('TRD-20260621-000002', 'AAPL', 'BUY', 50.00, 180.2500, 184.1000, 192.5000, '2026-06-21', 'BOOKED', NULL, CURRENT_TIMESTAMP, 'seed'),
+    ('TRD-20260621-000003', 'MSFT', 'SELL', 40.00, 410.7500, 407.5000, 130.0000, '2026-06-21', 'BOOKED', NULL, CURRENT_TIMESTAMP, 'seed'),
+    ('TRD-20260621-000004', 'XAU/USD', 'BUY', 10.00, 2320.0000, 2335.5000, 155.0000, '2026-06-21', 'BOOKED', NULL, CURRENT_TIMESTAMP, 'seed'),
     ('TRD-20260621-000005', 'TSLA', 'BUY', 0.00, 250.0000, 252.0000, 0.0000, '2026-06-21', 'REJECTED', 'quantity must be greater than 0', NULL, 'seed');
 
 SELECT setval('trade_id_sequence', 5, TRUE);
+
+INSERT INTO audit_logs (event_type, entity_type, entity_id, description)
+VALUES
+    ('TRADE_VALIDATED', 'TRADE', 'TRD-20260621-000001', 'Seed trade TRD-20260621-000001 passed validation checks.'),
+    ('TRADE_BOOKED', 'TRADE', 'TRD-20260621-000001', 'Seed trade TRD-20260621-000001 was booked.'),
+    ('TRADE_VALIDATED', 'TRADE', 'TRD-20260621-000002', 'Seed trade TRD-20260621-000002 passed validation checks.'),
+    ('TRADE_BOOKED', 'TRADE', 'TRD-20260621-000002', 'Seed trade TRD-20260621-000002 was booked.'),
+    ('TRADE_VALIDATED', 'TRADE', 'TRD-20260621-000003', 'Seed trade TRD-20260621-000003 passed validation checks.'),
+    ('TRADE_BOOKED', 'TRADE', 'TRD-20260621-000003', 'Seed trade TRD-20260621-000003 was booked.'),
+    ('TRADE_VALIDATED', 'TRADE', 'TRD-20260621-000004', 'Seed trade TRD-20260621-000004 passed validation checks.'),
+    ('TRADE_BOOKED', 'TRADE', 'TRD-20260621-000004', 'Seed trade TRD-20260621-000004 was booked.'),
+    ('TRADE_REJECTED', 'TRADE', 'TRD-20260621-000005', 'Seed trade TRD-20260621-000005 was rejected: quantity must be greater than 0.');

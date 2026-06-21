@@ -22,7 +22,7 @@
           <strong id="totalTrades">0</strong>
         </article>
         <article class="metric">
-          <span>Valid</span>
+          <span>Booked</span>
           <strong id="validTrades">0</strong>
         </article>
         <article class="metric">
@@ -149,13 +149,49 @@
                 <th>Market Price</th>
                 <th>P&L</th>
                 <th>Status</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody id="tradesTable"></tbody>
           </table>
         </div>
       </section>
+
+      <section class="panel audit-panel">
+        <div class="section-heading">
+          <div>
+            <h2>Audit Trail</h2>
+            <p id="auditStatus">Latest system events</p>
+          </div>
+          <button id="refreshAuditButton" class="secondary-button" type="button">Refresh Audit Trail</button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="audit-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Event Type</th>
+                <th>Entity</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody id="auditTable"></tbody>
+          </table>
+        </div>
+      </section>
     </main>
+
+    <div id="tradeDetailModal" class="modal" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="tradeDetailTitle">
+        <div class="section-heading">
+          <h2 id="tradeDetailTitle">Trade Detail</h2>
+          <button id="closeTradeDetailButton" class="secondary-button" type="button">Close</button>
+        </div>
+        <div id="tradeDetailContent" class="detail-grid"></div>
+      </section>
+    </div>
 
     <script src="/app.js"></script>
   </body>

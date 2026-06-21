@@ -2,6 +2,7 @@ const { pool } = require("../config/db");
 const { calculatePnL } = require("../services/pnlService");
 const { validateTrade } = require("../services/validationService");
 const { getLatestMarketPrice } = require("../services/marketDataService");
+const { createAuditLog } = require("../services/auditLogService");
 
 function formatDateForTradeId(dateValue) {
   const date = new Date(dateValue);
@@ -35,7 +36,7 @@ async function isActiveInstrument(symbol) {
   return result.rowCount > 0;
 }
 
-async function refreshValidTradesMarketPrices() {
+async function refreshBookedTradesMarketPrices() {
   const result = await pool.query(`
     SELECT
       id,
@@ -46,9 +47,10 @@ async function refreshValidTradesMarketPrices() {
       market_price,
       pnl
     FROM trades
-    WHERE status = 'VALID'
+    WHERE status = 'BOOKED'
   `);
   const pricesByInstrument = new Map();
+  let recalculatedCount = 0;
 
   for (const trade of result.rows) {
     try {
@@ -82,9 +84,19 @@ async function refreshValidTradesMarketPrices() {
           trade.id
         ]
       );
+      recalculatedCount += 1;
     } catch (error) {
       console.warn(`Market price refresh skipped for ${trade.instrument}: ${error.message}`);
     }
+  }
+
+  if (recalculatedCount > 0) {
+    await createAuditLog(
+      "PNL_RECALCULATED",
+      "TRADE",
+      null,
+      `Recalculated P&L for ${recalculatedCount} booked trade(s) across ${pricesByInstrument.size} instrument(s).`
+    );
   }
 }
 
@@ -121,6 +133,13 @@ async function createTrade(req, res) {
       : false;
 
     if (!instrumentExists) {
+      await createAuditLog(
+        "TRADE_REJECTED",
+        "TRADE",
+        null,
+        `Trade rejected because ${normalizedInstrument || "UNKNOWN"} is not an active instrument.`
+      );
+
       return res.status(400).json({
         message: "Trade rejected: Invalid or inactive instrument.",
         tradeId: null,
@@ -148,7 +167,7 @@ async function createTrade(req, res) {
 
     storedTradeId = await generateTradeId(storedTradeDate);
 
-    const status = rejectionReason ? "REJECTED" : "VALID";
+    const status = rejectionReason ? "REJECTED" : "BOOKED";
     const storedMarketPrice = marketData ? marketData.marketPrice : 0;
     const pnl = rejectionReason
       ? 0
@@ -202,8 +221,38 @@ async function createTrade(req, res) {
       ]
     );
 
+    await createAuditLog(
+      "TRADE_CREATED",
+      "TRADE",
+      storedTradeId,
+      `Trade ${storedTradeId} was captured for ${storedInstrument}.`
+    );
+
+    if (status === "REJECTED") {
+      await createAuditLog(
+        "TRADE_REJECTED",
+        "TRADE",
+        storedTradeId,
+        `Trade ${storedTradeId} was rejected: ${rejectionReason}.`
+      );
+    } else {
+      await createAuditLog(
+        "TRADE_VALIDATED",
+        "TRADE",
+        storedTradeId,
+        `Trade ${storedTradeId} passed validation checks.`
+      );
+
+      await createAuditLog(
+        "TRADE_BOOKED",
+        "TRADE",
+        storedTradeId,
+        `Trade ${storedTradeId} passed validation and was booked.`
+      );
+    }
+
     return res.status(201).json({
-      message: rejectionReason ? "Trade rejected and stored" : "Trade captured successfully",
+      message: rejectionReason ? "Trade rejected and stored" : "Trade booked successfully",
       tradeId: storedTradeId,
       status,
       marketPrice: storedMarketPrice,
@@ -231,7 +280,7 @@ async function createTrade(req, res) {
 
 async function getTrades(req, res) {
   try {
-    await refreshValidTradesMarketPrices();
+    await refreshBookedTradesMarketPrices();
 
     const result = await pool.query(`
       SELECT
@@ -262,15 +311,56 @@ async function getTrades(req, res) {
   }
 }
 
+async function getTradeByTradeId(req, res) {
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          id AS "Id",
+          trade_id AS "TradeId",
+          instrument AS "Instrument",
+          trade_type AS "TradeType",
+          quantity AS "Quantity",
+          trade_price AS "TradePrice",
+          market_price AS "MarketPrice",
+          pnl AS "PnL",
+          trade_date AS "TradeDate",
+          status AS "Status",
+          rejection_reason AS "RejectionReason",
+          last_price_updated_at AS "LastPriceUpdatedAt",
+          market_data_source AS "MarketDataSource",
+          created_at AS "CreatedAt"
+        FROM trades
+        WHERE trade_id = $1
+        LIMIT 1
+      `,
+      [req.params.tradeId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        message: "Trade not found"
+      });
+    }
+
+    return res.json(result.rows[0]);
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to retrieve trade",
+      error: error.message
+    });
+  }
+}
+
 async function getTradeReport(req, res) {
   try {
     const result = await pool.query(`
       SELECT
         COUNT(*)::INT AS "TotalTrades",
-        COALESCE(SUM(CASE WHEN status = 'VALID' THEN 1 ELSE 0 END), 0)::INT AS "ValidTrades",
+        COALESCE(SUM(CASE WHEN status = 'BOOKED' THEN 1 ELSE 0 END), 0)::INT AS "ValidTrades",
         COALESCE(SUM(CASE WHEN status = 'REJECTED' THEN 1 ELSE 0 END), 0)::INT AS "RejectedTrades",
         -- P&L reporting excludes rejected trades because their economics were not accepted.
-        COALESCE(SUM(CASE WHEN status = 'VALID' THEN pnl ELSE 0 END), 0)::NUMERIC(18,4) AS "TotalPnL"
+        COALESCE(SUM(CASE WHEN status = 'BOOKED' THEN pnl ELSE 0 END), 0)::NUMERIC(18,4) AS "TotalPnL"
       FROM trades
     `);
 
@@ -286,5 +376,6 @@ async function getTradeReport(req, res) {
 module.exports = {
   createTrade,
   getTrades,
+  getTradeByTradeId,
   getTradeReport
 };
