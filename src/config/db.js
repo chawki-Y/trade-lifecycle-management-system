@@ -9,6 +9,7 @@ const dbConfig = {
   port: Number(process.env.DB_PORT) || 5432
 };
 
+// A shared connection pool lets every request reuse PostgreSQL connections efficiently.
 const pool = new Pool(dbConfig);
 
 pool.on("connect", () => {

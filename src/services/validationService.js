@@ -1,4 +1,5 @@
 function validateTrade(trade) {
+  // Return the first failed rule so the trade can be stored with a clear rejection reason.
   if (!trade.tradeId) {
     return "tradeId is required";
   }

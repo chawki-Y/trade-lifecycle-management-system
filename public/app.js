@@ -77,6 +77,7 @@ async function loadTrades() {
 }
 
 async function refreshDashboard() {
+  // The summary and table are independent reads, so they can load in parallel.
   await Promise.all([loadReport(), loadTrades()]);
 }
 
@@ -85,6 +86,7 @@ tradeForm.addEventListener("submit", async (event) => {
   setMessage("Submitting trade...");
 
   const formData = new FormData(tradeForm);
+  // Match the JSON shape expected by POST /api/trades.
   const payload = {
     tradeId: formData.get("tradeId").trim(),
     instrument: formData.get("instrument").trim().toUpperCase(),

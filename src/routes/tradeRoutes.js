@@ -7,6 +7,7 @@ const {
 
 const router = express.Router();
 
+// Mounted in server.js at /api/trades.
 router.post("/", createTrade);
 router.get("/", getTrades);
 router.get("/report", getTradeReport);

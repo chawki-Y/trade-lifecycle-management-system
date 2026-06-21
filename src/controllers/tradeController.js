@@ -29,12 +29,15 @@ async function createTrade(req, res) {
   const pnl = rejectionReason
     ? 0
     : calculatePnL(normalizedTradeType, quantity, tradePrice, marketPrice);
+
+  // Rejected trades are still stored so operations/reporting can see failed captures.
   const storedTradeId = tradeId || `MISSING-TRADE-ID-${Date.now()}`;
   const storedInstrument = instrument || "UNKNOWN";
   const storedTradeType = normalizedTradeType || "INVALID";
   const storedTradeDate = tradeDate || new Date();
 
   try {
+    // PostgreSQL placeholders keep user input separate from SQL text.
     await pool.query(
       `
         INSERT INTO trades (
@@ -84,6 +87,7 @@ async function createTrade(req, res) {
       rejectionReason
     });
   } catch (error) {
+    // 23505 is PostgreSQL's unique constraint violation code.
     if (error.code === "23505") {
       return res.status(409).json({
         message: "TradeId already exists",
@@ -137,6 +141,7 @@ async function getTradeReport(req, res) {
         COUNT(*)::INT AS "TotalTrades",
         COALESCE(SUM(CASE WHEN status = 'VALID' THEN 1 ELSE 0 END), 0)::INT AS "ValidTrades",
         COALESCE(SUM(CASE WHEN status = 'REJECTED' THEN 1 ELSE 0 END), 0)::INT AS "RejectedTrades",
+        -- P&L reporting excludes rejected trades because their economics were not accepted.
         COALESCE(SUM(CASE WHEN status = 'VALID' THEN pnl ELSE 0 END), 0)::NUMERIC(18,4) AS "TotalPnL"
       FROM trades
     `);
