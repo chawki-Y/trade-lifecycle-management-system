@@ -1,4 +1,4 @@
-# Trade Processing System
+# Trade Lifecycle Management System
 
 A full-stack mini trade-processing system that simulates a simplified capital markets workflow.
 
