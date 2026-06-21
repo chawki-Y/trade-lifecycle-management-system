@@ -114,6 +114,8 @@ Included examples demonstrate:
 
 The interface was tested across desktop and mobile viewports to ensure usability for trade capture, market monitoring, reporting, and audit trail navigation.
 
+---
+
 ## Tech Stack
 
 - Node.js
