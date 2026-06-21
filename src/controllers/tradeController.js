@@ -48,10 +48,15 @@ async function refreshValidTradesMarketPrices() {
     FROM trades
     WHERE status = 'VALID'
   `);
+  const pricesByInstrument = new Map();
 
   for (const trade of result.rows) {
     try {
-      const marketData = await getLatestMarketPrice(trade.instrument);
+      if (!pricesByInstrument.has(trade.instrument)) {
+        pricesByInstrument.set(trade.instrument, await getLatestMarketPrice(trade.instrument));
+      }
+
+      const marketData = pricesByInstrument.get(trade.instrument);
       const pnl = calculatePnL(
         trade.trade_type,
         trade.quantity,

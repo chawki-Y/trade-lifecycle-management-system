@@ -129,7 +129,7 @@ async function loadMarketPrice(symbol) {
     symbol: marketData.symbol,
     price: marketData.marketPrice,
     timestamp: marketData.timestamp,
-    status: marketData.cached ? "Cached price" : "Live price"
+    status: marketData.fromCache ? "Price source: Cache" : "Price source: API"
   });
 }
 

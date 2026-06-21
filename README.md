@@ -83,7 +83,8 @@ Example:
   "marketPrice": 185.22,
   "source": "twelvedata",
   "timestamp": "2026-06-21T12:00:00.000Z",
-  "cached": false
+  "fromCache": false,
+  "stale": false
 }
 ```
 
@@ -99,7 +100,15 @@ The dashboard behaves like a simplified trading workstation:
 - When a trade is submitted, the backend fetches the latest available market price and uses it to calculate P&L.
 - When `GET /api/trades` is called, valid trades attempt to refresh their market price and recalculate P&L.
 
-Market prices are cached server-side for 60 seconds per symbol to reduce free API usage and avoid unnecessary provider calls.
+Market prices are cached server-side to reduce free API usage and avoid unnecessary provider calls.
+
+Cache behavior:
+
+- Stocks and crypto use a 60-second cache.
+- FX pairs and commodities use a 120-second cache.
+- The frontend can refresh every 5 seconds, but repeated backend requests reuse cached prices while the cache is valid.
+- If the provider fails and a stale cached price exists, the backend returns the stale cached price instead of crashing.
+- When refreshing the trades table, the backend fetches one price per unique instrument and reuses it for all trades with that instrument.
 
 Configure market data in `.env`:
 
@@ -108,7 +117,7 @@ MARKET_DATA_PROVIDER=twelvedata
 MARKET_DATA_API_KEY=your_market_data_api_key
 ```
 
-Free market data APIs can have rate limits, delayed data, symbol coverage differences, and daily request limits. If the provider is unavailable while refreshing existing trades, the app keeps the previously stored market price and logs a warning.
+Free market data APIs can have rate limits, delayed data, symbol coverage differences, and daily request limits. The cache layer simulates real-world rate-limit and resilience handling: the UI can feel live without forcing the backend to call the external provider every 5 seconds. If the provider is unavailable while refreshing existing trades, the app keeps the previously stored market price and logs a warning.
 
 ## Recommended Screenshots
 

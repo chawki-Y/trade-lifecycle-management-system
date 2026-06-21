@@ -36,7 +36,8 @@ async function getMarketPrice(req, res) {
       marketPrice: marketData.marketPrice,
       source: marketData.source,
       timestamp: marketData.timestamp,
-      cached: marketData.cached
+      fromCache: marketData.fromCache,
+      stale: marketData.stale
     });
   } catch (error) {
     return res.status(502).json({
