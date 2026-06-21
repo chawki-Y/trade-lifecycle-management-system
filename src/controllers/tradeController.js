@@ -1,0 +1,157 @@
+const { pool } = require("../config/db");
+const { calculatePnL } = require("../services/pnlService");
+const { validateTrade } = require("../services/validationService");
+
+async function createTrade(req, res) {
+  const {
+    tradeId,
+    instrument,
+    tradeType,
+    quantity,
+    tradePrice,
+    marketPrice,
+    tradeDate
+  } = req.body;
+
+  const normalizedTradeType = String(tradeType || "").toUpperCase();
+  const trade = {
+    tradeId,
+    instrument,
+    tradeType: normalizedTradeType,
+    quantity,
+    tradePrice,
+    marketPrice,
+    tradeDate
+  };
+
+  const rejectionReason = validateTrade(trade);
+  const status = rejectionReason ? "REJECTED" : "VALID";
+  const pnl = rejectionReason
+    ? 0
+    : calculatePnL(normalizedTradeType, quantity, tradePrice, marketPrice);
+  const storedTradeId = tradeId || `MISSING-TRADE-ID-${Date.now()}`;
+  const storedInstrument = instrument || "UNKNOWN";
+  const storedTradeType = normalizedTradeType || "INVALID";
+  const storedTradeDate = tradeDate || new Date();
+
+  try {
+    await pool.query(
+      `
+        INSERT INTO trades (
+          trade_id,
+          instrument,
+          trade_type,
+          quantity,
+          trade_price,
+          market_price,
+          pnl,
+          trade_date,
+          status,
+          rejection_reason
+        )
+        VALUES (
+          $1,
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          $7,
+          $8,
+          $9,
+          $10
+        )
+      `,
+      [
+        storedTradeId,
+        storedInstrument,
+        storedTradeType,
+        Number(quantity) || 0,
+        Number(tradePrice) || 0,
+        Number(marketPrice) || 0,
+        pnl,
+        storedTradeDate,
+        status,
+        rejectionReason
+      ]
+    );
+
+    return res.status(201).json({
+      message: rejectionReason ? "Trade rejected and stored" : "Trade captured successfully",
+      tradeId: storedTradeId,
+      status,
+      pnl,
+      rejectionReason
+    });
+  } catch (error) {
+    if (error.code === "23505") {
+      return res.status(409).json({
+        message: "TradeId already exists",
+        tradeId: storedTradeId,
+        status: "REJECTED",
+        pnl: 0,
+        rejectionReason: "Duplicate tradeId"
+      });
+    }
+
+    return res.status(500).json({
+      message: "Failed to create trade",
+      error: error.message
+    });
+  }
+}
+
+async function getTrades(req, res) {
+  try {
+    const result = await pool.query(`
+      SELECT
+        id AS "Id",
+        trade_id AS "TradeId",
+        instrument AS "Instrument",
+        trade_type AS "TradeType",
+        quantity AS "Quantity",
+        trade_price AS "TradePrice",
+        market_price AS "MarketPrice",
+        pnl AS "PnL",
+        trade_date AS "TradeDate",
+        status AS "Status",
+        rejection_reason AS "RejectionReason",
+        created_at AS "CreatedAt"
+      FROM trades
+      ORDER BY created_at DESC
+    `);
+
+    return res.json(result.rows);
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to retrieve trades",
+      error: error.message
+    });
+  }
+}
+
+async function getTradeReport(req, res) {
+  try {
+    const result = await pool.query(`
+      SELECT
+        COUNT(*)::INT AS "TotalTrades",
+        COALESCE(SUM(CASE WHEN status = 'VALID' THEN 1 ELSE 0 END), 0)::INT AS "ValidTrades",
+        COALESCE(SUM(CASE WHEN status = 'REJECTED' THEN 1 ELSE 0 END), 0)::INT AS "RejectedTrades",
+        COALESCE(SUM(CASE WHEN status = 'VALID' THEN pnl ELSE 0 END), 0)::NUMERIC(18,4) AS "TotalPnL"
+      FROM trades
+    `);
+
+    return res.json(result.rows[0]);
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to generate trade report",
+      error: error.message
+    });
+  }
+}
+
+module.exports = {
+  createTrade,
+  getTrades,
+  getTradeReport
+};
