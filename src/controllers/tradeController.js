@@ -357,6 +357,7 @@ async function getTradeReport(req, res) {
     const result = await pool.query(`
       SELECT
         COUNT(*)::INT AS "TotalTrades",
+        COALESCE(SUM(CASE WHEN status = 'BOOKED' THEN 1 ELSE 0 END), 0)::INT AS "BookedTrades",
         COALESCE(SUM(CASE WHEN status = 'BOOKED' THEN 1 ELSE 0 END), 0)::INT AS "ValidTrades",
         COALESCE(SUM(CASE WHEN status = 'REJECTED' THEN 1 ELSE 0 END), 0)::INT AS "RejectedTrades",
         -- P&L reporting excludes rejected trades because their economics were not accepted.

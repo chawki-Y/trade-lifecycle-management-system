@@ -1,7 +1,7 @@
 {
-  "name": "trade-processing-system",
+  "name": "trade-lifecycle-management-system",
   "version": "1.0.0",
-  "description": "Mini financial trade processing backend using Node.js, Express, and PostgreSQL.",
+  "description": "Mini financial trade lifecycle management system using Node.js, Express, and PostgreSQL.",
   "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",
@@ -12,7 +12,7 @@
     "express",
     "postgresql",
     "fintech",
-    "trade-processing",
+    "trade-lifecycle-management",
     "pnl"
   ],
   "author": "",

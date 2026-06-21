@@ -1,6 +1,6 @@
 # Trade Lifecycle Management System
 
-A full-stack mini trade-processing system that simulates a simplified capital markets workflow.
+A full-stack mini trade lifecycle management system that simulates a simplified capital markets workflow.
 
 The application allows users to enter financial trades, select valid instruments from PostgreSQL reference data, fetch live market prices, validate trade data, calculate profit/loss, store trades in PostgreSQL, and view trade reporting metrics from a simple dashboard.
 
@@ -31,7 +31,7 @@ This project was built to demonstrate backend API development, SQL/database desi
 - Show reporting dashboard with total trades, booked trades, rejected trades, and total P&L
 - Responsive frontend for laptop and mobile
 
-- ## Screenshots
+## Screenshots
 
 ### Dashboard Overview
 
@@ -89,7 +89,7 @@ Includes:
 
 ### Audit Trail
 
-Operational event tracking and audit history for trade processing, market data refreshes, and P&L recalculations.
+Operational event tracking and audit history for trade lifecycle events, market data refreshes, and P&L recalculations.
 
 ![Audit Trail](screenshots/audit-trail.png)
 
@@ -104,7 +104,48 @@ Operational event tracking and audit history for trade processing, market data r
 - JavaScript
 - Market data provider: Twelve Data by default
 
+## Setup
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Create a PostgreSQL database named `trade_processing_db`.
+
+3. Run `database.sql` against the database to create tables, seed instruments, seed demo trades, and seed audit events.
+
+4. Create `.env` from `.env.example`:
+
+```env
+PORT=3001
+DB_USER=postgres
+DB_PASSWORD=your_password
+DB_HOST=localhost
+DB_DATABASE=trade_processing_db
+DB_PORT=5432
+MARKET_DATA_PROVIDER=twelvedata
+MARKET_DATA_API_KEY=your_market_data_api_key
+```
+
+5. Start the app:
+
+```bash
+npm run dev
+```
+
+Then open:
+
+```text
+http://localhost:3001
+```
+
 ## API Endpoints
+
+### GET `/api/health`
+
+Returns a simple health-check response confirming the API is running.
 
 ### POST `/api/trades`
 
@@ -140,6 +181,20 @@ Returns trade reporting metrics:
 - Booked trades
 - Rejected trades
 - Total P&L
+
+Example:
+
+```json
+{
+  "TotalTrades": 6,
+  "BookedTrades": 5,
+  "ValidTrades": 5,
+  "RejectedTrades": 1,
+  "TotalPnL": "727.5000"
+}
+```
+
+`ValidTrades` is kept for backward compatibility, while `BookedTrades` is the clearer lifecycle-based field used by the dashboard.
 
 ### GET `/api/instruments`
 
@@ -211,7 +266,7 @@ Example:
 
 ## Trade Lifecycle
 
-The project uses a simplified lifecycle to make trade processing more realistic:
+The project uses a simplified lifecycle to make trade lifecycle management more realistic:
 
 - `NEW`: trade request has been submitted.
 - `VALIDATED`: trade passed business validation.
@@ -292,18 +347,6 @@ Free market data APIs can have rate limits, delayed data, symbol coverage differ
 
 The Market Overview simulates a simplified market watchlist found in financial platforms. It supports market data monitoring alongside trade lifecycle management and P&L tracking.
 
-## Recommended Screenshots
-
-For GitHub presentation, add screenshots that show:
-
-- Dashboard summary with total trades, booked trades, rejected trades, and total P&L
-- Live market price card for a selected instrument
-- Market Overview watchlist showing all active instruments and cached/API price source labels
-- Capture Trade form with the instrument dropdown loaded from PostgreSQL
-- Latest Trades table showing generated trade IDs, refreshed market prices, status, View button, and P&L
-- Trade detail modal
-- Audit Trail section
-
 ## P&L Formula
 
 BUY:
@@ -321,7 +364,14 @@ SELL:
 ## Project Structure
 
 ```text
-trade-processing-system/
+trade-lifecycle-management-system/
+|-- screenshots/
+|   |-- audit-trail.png
+|   |-- dashboard-overview.png
+|   |-- latest-trades.png
+|   |-- market-overview.png
+|   |-- trade-capture.png
+|   `-- trade-detail-view.png
 |-- public/
 |   |-- index.html
 |   |-- styles.css

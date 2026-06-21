@@ -122,7 +122,7 @@ async function fetchJson(url, options) {
 async function loadReport() {
   const report = await fetchJson("/api/trades/report");
   metricEls.totalTrades.textContent = report.TotalTrades ?? 0;
-  metricEls.validTrades.textContent = report.ValidTrades ?? 0;
+  metricEls.validTrades.textContent = report.BookedTrades ?? report.ValidTrades ?? 0;
   metricEls.rejectedTrades.textContent = report.RejectedTrades ?? 0;
   metricEls.totalPnl.textContent = formatNumber(report.TotalPnL ?? 0);
 }

@@ -22,7 +22,7 @@ app.get("/", (req, res) => {
 });
 
 app.get("/api/health", (req, res) => {
-  res.json({ message: "Trade Processing System API is running" });
+  res.json({ message: "Trade Lifecycle Management System API is running" });
 });
 
 app.use("/api/trades", tradeRoutes);
@@ -32,5 +32,5 @@ app.use("/api/market-overview", marketOverviewRoutes);
 app.use("/api/audit-logs", auditLogRoutes);
 
 app.listen(PORT, () => {
-  console.log(`Trade Processing System API listening on port ${PORT}`);
+  console.log(`Trade Lifecycle Management System API listening on port ${PORT}`);
 });
