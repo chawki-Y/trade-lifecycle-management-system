@@ -15,6 +15,7 @@ This project was built to demonstrate backend API development, SQL/database desi
 - Load active instruments from a PostgreSQL reference table
 - Select instruments from a frontend dropdown
 - Fetch latest market prices from a configurable market data provider
+- View a Market Overview watchlist for all active instruments
 - Refresh the selected instrument market price every 5 seconds
 - Validate trade input data
 - Validate submitted instruments against backend reference data
@@ -89,10 +90,37 @@ Example:
 }
 ```
 
+### GET `/api/market-overview`
+
+Returns the latest available market prices for all active instruments.
+
+The endpoint loads instruments from PostgreSQL, retrieves prices through the market data service, and uses the server-side cache when prices are still valid.
+
+Example:
+
+```json
+[
+  {
+    "symbol": "AAPL",
+    "name": "Apple Inc.",
+    "assetClass": "Equity",
+    "currency": "USD",
+    "marketPrice": 185.22,
+    "lastUpdated": "2026-06-21T12:45:03.000Z",
+    "source": "twelvedata",
+    "fromCache": true,
+    "stale": false
+  }
+]
+```
+
 ## Live Market Data
 
 The dashboard behaves like a simplified trading workstation:
 
+- The Market Overview section shows a watchlist of all active instruments.
+- Users can view latest market prices without creating a trade.
+- The Market Overview refresh button reloads prices through the backend cache and does not bypass rate-limit protection.
 - User selects an instrument from the dropdown.
 - The frontend calls `GET /api/market-price/:symbol`.
 - The current market price card updates immediately.
@@ -121,12 +149,15 @@ MARKET_DATA_API_KEY=your_market_data_api_key
 
 Free market data APIs can have rate limits, delayed data, symbol coverage differences, and daily request limits. The cache layer simulates real-world rate-limit and resilience handling: the UI can feel live without forcing the backend to call the external provider every 5 seconds. If the provider is unavailable while refreshing existing trades, the app keeps the previously stored market price and logs a warning.
 
+The Market Overview simulates a simplified market watchlist found in financial platforms. It supports market data monitoring alongside trade lifecycle management and P&L tracking.
+
 ## Recommended Screenshots
 
 For GitHub presentation, add screenshots that show:
 
 - Dashboard summary with total trades, valid trades, rejected trades, and total P&L
 - Live market price card for a selected instrument
+- Market Overview watchlist showing all active instruments and cached/API price source labels
 - Capture Trade form with the instrument dropdown loaded from PostgreSQL
 - Latest Trades table showing generated trade IDs, refreshed market prices, status, and P&L
 
@@ -158,10 +189,12 @@ trade-processing-system/
 |   |-- controllers/
 |   |   |-- instrumentController.js
 |   |   |-- marketDataController.js
+|   |   |-- marketOverviewController.js
 |   |   `-- tradeController.js
 |   |-- routes/
 |   |   |-- instrumentRoutes.js
 |   |   |-- marketDataRoutes.js
+|   |   |-- marketOverviewRoutes.js
 |   |   `-- tradeRoutes.js
 |   |-- services/
 |   |   |-- marketDataService.js

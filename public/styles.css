@@ -116,6 +116,12 @@ h2 {
   text-align: right;
 }
 
+#marketOverviewStatus {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: 4px;
+}
+
 #formMessage.error {
   color: var(--danger);
 }
@@ -228,12 +234,21 @@ button:disabled {
   max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  max-height: 200px;
+}
+
+.market-overview-wrap {
+  max-height: none;
 }
 
 table {
   width: 100%;
   min-width: 940px;
   border-collapse: collapse;
+}
+
+.market-overview-table {
+  min-width: 1040px;
 }
 
 th,
@@ -288,6 +303,32 @@ td {
 }
 
 .status.rejected {
+  background: #fee4e2;
+  color: #912018;
+}
+
+.source-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.source-pill.api {
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.source-pill.cache {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.source-pill.unavailable {
   background: #fee4e2;
   color: #912018;
 }

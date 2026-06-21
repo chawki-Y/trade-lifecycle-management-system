@@ -10,7 +10,7 @@
     <header class="topbar">
       <div>
         <p class="eyebrow">Fintech Operations</p>
-        <h1>Trade Processing System</h1>
+        <h1>Trade Lifecycle Management System</h1>
       </div>
       <button id="refreshButton" class="secondary-button" type="button">Refresh</button>
     </header>
@@ -57,6 +57,33 @@
             <span>Last Checked</span>
             <strong id="marketPriceCheckedAt">-</strong>
           </div>
+        </div>
+      </section>
+
+      <section class="panel market-overview-panel" aria-label="Market overview">
+        <div class="section-heading">
+          <div>
+            <h2>Market Overview</h2>
+            <p id="marketOverviewStatus">Latest prices for active instruments</p>
+          </div>
+          <button id="refreshMarketOverviewButton" class="secondary-button" type="button">Refresh Market Overview</button>
+        </div>
+
+        <div class="table-wrap market-overview-wrap">
+          <table class="market-overview-table">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Instrument Name</th>
+                <th>Asset Class</th>
+                <th>Currency</th>
+                <th>Latest Market Price</th>
+                <th>Last Updated</th>
+                <th>Data Source</th>
+              </tr>
+            </thead>
+            <tbody id="marketOverviewTable"></tbody>
+          </table>
         </div>
       </section>
 

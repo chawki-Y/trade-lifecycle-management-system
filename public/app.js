@@ -1,8 +1,11 @@
 const tradeForm = document.querySelector("#tradeForm");
 const refreshButton = document.querySelector("#refreshButton");
+const refreshMarketOverviewButton = document.querySelector("#refreshMarketOverviewButton");
 const formMessage = document.querySelector("#formMessage");
 const tradesTable = document.querySelector("#tradesTable");
 const tradeCount = document.querySelector("#tradeCount");
+const marketOverviewTable = document.querySelector("#marketOverviewTable");
+const marketOverviewStatus = document.querySelector("#marketOverviewStatus");
 const instrumentSelect = document.querySelector("#instrument");
 const submitButton = tradeForm.querySelector("button[type='submit']");
 const selectedInstrumentLabel = document.querySelector("#selectedInstrumentLabel");
@@ -61,6 +64,18 @@ function formatTime(value) {
   return new Date(value).toLocaleTimeString();
 }
 
+function formatSource(source) {
+  if (!source || source === "Unavailable") {
+    return source || "-";
+  }
+
+  if (source === "twelvedata") {
+    return "Twelve Data";
+  }
+
+  return source;
+}
+
 function setMarketPriceState({ symbol = "-", price = null, timestamp = null, checkedAt = null, status = "" }) {
   selectedInstrumentLabel.textContent = symbol;
   marketPriceValue.textContent = price === null ? "-" : formatMarketPrice(price);
@@ -86,6 +101,50 @@ async function loadReport() {
   metricEls.validTrades.textContent = report.ValidTrades ?? 0;
   metricEls.rejectedTrades.textContent = report.RejectedTrades ?? 0;
   metricEls.totalPnl.textContent = formatNumber(report.TotalPnL ?? 0);
+}
+
+async function loadMarketOverview() {
+  marketOverviewStatus.textContent = "Loading market prices...";
+  refreshMarketOverviewButton.disabled = true;
+
+  try {
+    const overview = await fetchJson("/api/market-overview");
+
+    if (!overview.length) {
+      marketOverviewTable.innerHTML = `<tr><td class="empty-row" colspan="7">No active instruments available.</td></tr>`;
+      marketOverviewStatus.textContent = "No active instruments";
+      return;
+    }
+
+    marketOverviewTable.innerHTML = overview.map((instrument) => {
+      const sourceLabel = instrument.marketPrice === null ? "Unavailable" : instrument.fromCache ? "Cache" : "API";
+      const sourceClass = instrument.marketPrice === null ? "unavailable" : instrument.fromCache ? "cache" : "api";
+      const price = instrument.marketPrice === null ? "Unavailable" : formatMarketPrice(instrument.marketPrice);
+      const updatedAt = formatTime(instrument.lastUpdated);
+
+      return `
+        <tr>
+          <td><strong>${instrument.symbol}</strong></td>
+          <td>${instrument.name}</td>
+          <td>${instrument.assetClass}</td>
+          <td>${instrument.currency || "-"}</td>
+          <td>${price}</td>
+          <td>${updatedAt}</td>
+          <td>
+            <span>${formatSource(instrument.source)}</span>
+            <span class="source-pill ${sourceClass}">Source: ${sourceLabel}</span>
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    marketOverviewStatus.textContent = `Updated ${overview.length} instruments`;
+  } catch (error) {
+    marketOverviewStatus.textContent = "Market overview unavailable";
+    marketOverviewTable.innerHTML = `<tr><td class="empty-row" colspan="7">${error.message}</td></tr>`;
+  } finally {
+    refreshMarketOverviewButton.disabled = false;
+  }
 }
 
 async function loadInstruments() {
@@ -207,6 +266,7 @@ async function loadTrades() {
 }
 
 async function refreshDashboard() {
+  await loadMarketOverview();
   await loadTrades();
   await loadReport();
 }
@@ -270,6 +330,10 @@ refreshButton.addEventListener("click", async () => {
   } catch (error) {
     setMessage(error.message, "error");
   }
+});
+
+refreshMarketOverviewButton.addEventListener("click", async () => {
+  await loadMarketOverview();
 });
 
 instrumentSelect.addEventListener("change", async () => {
