@@ -125,7 +125,6 @@ tradeForm.addEventListener("submit", async (event) => {
   const formData = new FormData(tradeForm);
   // Match the JSON shape expected by POST /api/trades.
   const payload = {
-    tradeId: formData.get("tradeId").trim(),
     instrument: formData.get("instrument"),
     tradeType: formData.get("tradeType"),
     quantity: Number(formData.get("quantity")),

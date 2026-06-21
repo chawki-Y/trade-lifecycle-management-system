@@ -2,6 +2,23 @@ const { pool } = require("../config/db");
 const { calculatePnL } = require("../services/pnlService");
 const { validateTrade } = require("../services/validationService");
 
+function formatDateForTradeId(dateValue) {
+  const date = new Date(dateValue);
+
+  if (Number.isNaN(date.getTime())) {
+    return new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  }
+
+  return date.toISOString().slice(0, 10).replace(/-/g, "");
+}
+
+async function generateTradeId(tradeDate) {
+  const result = await pool.query("SELECT nextval('trade_id_sequence') AS sequence_value");
+  const sequenceValue = String(result.rows[0].sequence_value).padStart(6, "0");
+
+  return `TRD-${formatDateForTradeId(tradeDate)}-${sequenceValue}`;
+}
+
 async function isActiveInstrument(symbol) {
   const result = await pool.query(
     `
@@ -19,7 +36,6 @@ async function isActiveInstrument(symbol) {
 
 async function createTrade(req, res) {
   const {
-    tradeId,
     instrument,
     tradeType,
     quantity,
@@ -31,7 +47,6 @@ async function createTrade(req, res) {
   const normalizedInstrument = String(instrument || "").trim().toUpperCase();
   const normalizedTradeType = String(tradeType || "").toUpperCase();
   const trade = {
-    tradeId,
     instrument: normalizedInstrument,
     tradeType: normalizedTradeType,
     quantity,
@@ -42,12 +57,14 @@ async function createTrade(req, res) {
 
   let rejectionReason = validateTrade(trade);
   // Rejected trades are still stored so operations/reporting can see failed captures.
-  const storedTradeId = tradeId || `MISSING-TRADE-ID-${Date.now()}`;
   const storedInstrument = normalizedInstrument || "UNKNOWN";
   const storedTradeType = normalizedTradeType || "INVALID";
   const storedTradeDate = tradeDate || new Date();
+  let storedTradeId = null;
 
   try {
+    storedTradeId = await generateTradeId(storedTradeDate);
+
     if (!rejectionReason) {
       // Instrument symbols are reference data; validate them server-side as well as in the UI.
       const instrumentExists = await isActiveInstrument(normalizedInstrument);

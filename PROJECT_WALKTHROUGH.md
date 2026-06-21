@@ -6,7 +6,7 @@ This document explains the Trade Processing System as if you built it and need t
 
 ### What Problem This App Solves
 
-The app solves a simplified version of a common financial operations problem: capturing trades, validating them against reference data, calculating profit and loss, storing the results, and reporting on trade activity.
+The app solves a simplified version of a common financial operations problem: capturing trades, generating controlled trade IDs, validating trades against reference data, calculating profit and loss, storing the results, and reporting on trade activity.
 
 Instead of manually inserting trade records into a database, users can enter trades through a dashboard. The instrument is selected from a PostgreSQL-backed reference table, which is closer to how real financial systems control valid products. The backend applies business rules, calculates P&L, and stores both valid and rejected trades in PostgreSQL. The dashboard then shows trade history and summary metrics.
 
@@ -43,7 +43,7 @@ When a user creates a trade from the frontend, this is what happens:
 2. `public/app.js` calls `GET /api/instruments`.
 3. The backend reads active instruments from the PostgreSQL `instruments` reference table.
 4. The frontend populates the instrument dropdown with valid symbols.
-5. The user fills the trade form with trade ID, selected instrument, trade type, quantity, trade price, market price, and trade date.
+5. The user fills the trade form with selected instrument, trade type, quantity, trade price, market price, and trade date.
 6. `public/app.js` listens for the form submission.
 7. The frontend builds a JSON payload matching the backend API contract.
 8. The frontend sends a `POST /api/trades` request using `fetch`.
@@ -54,13 +54,14 @@ When a user creates a trade from the frontend, this is what happens:
 13. If basic validation passes, the controller checks that the instrument exists and is active in the `instruments` table.
 14. If validation fails, the trade is marked `REJECTED` and given a rejection reason.
 15. If validation passes, the controller calls `calculatePnL` from `src/services/pnlService.js`.
-16. The controller inserts the trade into PostgreSQL using a parameterized query.
-17. The backend returns a JSON response with message, trade ID, status, P&L, and rejection reason.
-18. The frontend shows the result message to the user.
-19. The frontend refreshes the dashboard by calling:
+16. The controller generates a trade ID using the pattern `TRD-YYYYMMDD-000001`, where `YYYYMMDD` comes from the trade date and the final number comes from a PostgreSQL sequence.
+17. The controller inserts the trade into PostgreSQL using a parameterized query.
+18. The backend returns a JSON response with message, generated trade ID, status, P&L, and rejection reason.
+19. The frontend shows the result message to the user.
+20. The frontend refreshes the dashboard by calling:
     - `GET /api/trades/report`
     - `GET /api/trades`
-20. The summary metrics and latest trade table update on screen.
+21. The summary metrics and latest trade table update on screen.
 
 The important point is that the frontend does not calculate or trust business results by itself. The backend validates the submitted instrument against database reference data, calculates P&L, and persists the trade.
 
@@ -74,6 +75,8 @@ This is the frontend page served by Express. It defines the dashboard structure:
 - Summary metric cards for total trades, valid trades, rejected trades, and total P&L.
 - Trade capture form with an instrument dropdown.
 - Latest trades table.
+
+The form does not ask the user to type a trade ID. The backend generates it so IDs follow a controlled naming standard.
 
 It does not contain business logic. It provides the HTML elements that `app.js` reads from and updates.
 
@@ -192,11 +195,12 @@ Key responsibilities:
 - Receives API requests.
 - Extracts request data.
 - Calls validation and P&L services.
+- Generates trade IDs from trade date and PostgreSQL sequence values.
 - Decides trade status.
 - Inserts trades into PostgreSQL.
 - Reads trades from PostgreSQL.
 - Builds report metrics using SQL aggregation.
-- Handles duplicate trade IDs and server errors.
+- Handles generated trade ID conflicts and server errors.
 
 The controller coordinates the workflow but delegates specific rules to services.
 
@@ -228,7 +232,6 @@ It exports `validateTrade(trade)`.
 
 It checks:
 
-- `tradeId` exists.
 - `instrument` exists.
 - `tradeType` is BUY or SELL.
 - `quantity` is greater than 0.
@@ -238,13 +241,13 @@ It checks:
 
 It returns a rejection reason string if invalid, or `null` if valid.
 
-Instrument existence is then checked in the controller against the PostgreSQL `instruments` table because that check requires a database query.
+Instrument existence is then checked in the controller against the PostgreSQL `instruments` table because that check requires a database query. Trade ID is not validated from user input because the backend generates it.
 
 ### `database.sql`
 
 This file defines the PostgreSQL table structure.
 
-It creates the `instruments` table and the `trades` table if they do not already exist. It also seeds sample active instruments such as FX pairs, equities, gold, and Bitcoin. The `trades` table stores trade details, calculated P&L, validation status, rejection reason, and creation timestamp.
+It creates the `instruments` table, the `trade_id_sequence`, and the `trades` table if they do not already exist. It also seeds sample active instruments such as FX pairs, equities, gold, and Bitcoin. The `trades` table stores trade details, calculated P&L, validation status, rejection reason, and creation timestamp.
 
 It is useful for setting up the database on a new machine.
 
@@ -318,7 +321,6 @@ Creates a new trade, validates it, calculates P&L if valid, stores it in Postgre
 
 ```json
 {
-  "tradeId": "TRD-1001",
   "instrument": "AAPL",
   "tradeType": "BUY",
   "quantity": 100,
@@ -355,6 +357,7 @@ Then the controller runs an `INSERT INTO trades (...) VALUES (...)` query using 
 This stores:
 
 - Trade details
+- Backend-generated trade ID
 - Calculated P&L
 - Status: `VALID` or `REJECTED`
 - Rejection reason if invalid
@@ -366,7 +369,7 @@ Valid trade:
 ```json
 {
   "message": "Trade captured successfully",
-  "tradeId": "TRD-1001",
+  "tradeId": "TRD-20260621-000001",
   "status": "VALID",
   "pnl": 385,
   "rejectionReason": null
@@ -378,7 +381,7 @@ Rejected trade:
 ```json
 {
   "message": "Trade rejected and stored",
-  "tradeId": "TRD-1002",
+  "tradeId": "TRD-20260621-000002",
   "status": "REJECTED",
   "pnl": 0,
   "rejectionReason": "tradeType must be BUY or SELL"
@@ -390,7 +393,7 @@ Duplicate trade:
 ```json
 {
   "message": "TradeId already exists",
-  "tradeId": "TRD-1001",
+  "tradeId": "TRD-20260621-000003",
   "status": "REJECTED",
   "pnl": 0,
   "rejectionReason": "Duplicate tradeId"
@@ -429,7 +432,7 @@ The query aliases snake_case database columns into frontend-friendly names such 
 [
   {
     "Id": 1,
-    "TradeId": "TRD-1001",
+    "TradeId": "TRD-20260621-000001",
     "Instrument": "AAPL",
     "TradeType": "BUY",
     "Quantity": "100.00",
@@ -579,7 +582,7 @@ Auto-generated primary key. It uniquely identifies each database row.
 
 #### `trade_id`
 
-Business identifier for the trade. It is unique because a trade should not be captured twice with the same trade ID.
+Business identifier for the trade. It is generated by the backend using the pattern `TRD-YYYYMMDD-000001`. The date portion comes from `trade_date`, and the sequence portion comes from PostgreSQL. It is unique because the column has a unique constraint.
 
 #### `instrument`
 
@@ -657,7 +660,6 @@ This is efficient because PostgreSQL performs the aggregation instead of the app
 
 The validation service checks that:
 
-- Trade ID is present.
 - Instrument is present.
 - Instrument exists in the active PostgreSQL reference-data table.
 - Trade type is either BUY or SELL.
@@ -726,7 +728,7 @@ I built a full-stack trade-processing system using Node.js, Express, PostgreSQL,
 
 ### 2-Minute Explanation
 
-This project simulates a simplified capital markets trade workflow. The frontend provides a dashboard where a user selects an instrument from a dropdown and enters a trade with fields like trade ID, trade type, quantity, trade price, market price, and trade date.
+This project simulates a simplified capital markets trade workflow. The frontend provides a dashboard where a user selects an instrument from a dropdown and enters a trade with fields like trade type, quantity, trade price, market price, and trade date.
 
 The dropdown is populated from `GET /api/instruments`, which reads active instruments from PostgreSQL. When the user submits the form, the frontend sends a JSON request to an Express API. The backend controller receives the request, normalizes the trade type, validates required fields and numeric values, checks that the instrument exists and is active in the database, calculates P&L if the trade is valid, and saves the trade into PostgreSQL using a parameterized query.
 
@@ -776,9 +778,9 @@ It exposes resources through HTTP endpoints. `POST /api/trades` creates a trade,
 
 The app uses parameterized PostgreSQL queries with `$1`, `$2`, etc. User input is passed separately from the SQL string, so it is not directly concatenated into SQL.
 
-### 7. What happens if a duplicate trade ID is submitted?
+### 7. How are trade IDs generated?
 
-The database has a unique constraint on `trade_id`. PostgreSQL returns error code `23505`, and the API responds with HTTP `409 Conflict` and a duplicate trade rejection message.
+The backend generates trade IDs using the pattern `TRD-YYYYMMDD-000001`. The date comes from the submitted trade date, and the sequence number comes from PostgreSQL. The database still has a unique constraint on `trade_id` as a final safety check.
 
 ### 8. Why store rejected trades?
 
@@ -798,7 +800,7 @@ After a trade is submitted, the frontend calls `GET /api/trades/report` and `GET
 
 ### 12. What validation rules are implemented?
 
-The app checks required trade ID, required instrument, valid active instrument in PostgreSQL reference data, valid BUY/SELL trade type, quantity greater than zero, prices greater than zero, and required trade date.
+The app checks required instrument, valid active instrument in PostgreSQL reference data, valid BUY/SELL trade type, quantity greater than zero, prices greater than zero, and required trade date. Trade ID is generated by the backend.
 
 ### 13. Why is backend instrument validation required if the frontend has a dropdown?
 
@@ -806,7 +808,7 @@ Frontend validation is only for user experience. A user can bypass the browser a
 
 ### 14. What error handling exists?
 
-The API handles duplicate trade IDs with a `409` response and general database/server failures with a `500` response. The frontend catches failed requests and displays an error message.
+The API handles generated trade ID conflicts with a `409` response and general database/server failures with a `500` response. The frontend catches failed requests and displays an error message.
 
 ### 15. What security improvements would you add?
 
@@ -814,7 +816,7 @@ I would add authentication, role-based authorization, rate limiting, stronger in
 
 ### 16. How would you test this project?
 
-I would add unit tests for validation and P&L services, integration tests for API endpoints, and database tests for insert/report behavior. I would also test duplicate trade IDs, rejected trade scenarios, inactive instruments, and invalid instrument symbols submitted through Postman.
+I would add unit tests for validation and P&L services, integration tests for API endpoints, and database tests for insert/report behavior. I would also test generated trade ID format, rejected trade scenarios, inactive instruments, and invalid instrument symbols submitted through Postman.
 
 ### 17. Why use a connection pool?
 
@@ -874,7 +876,7 @@ The project does not yet include automated tests. The best first tests would cov
 - Validation rules.
 - Trade creation endpoint.
 - Report endpoint.
-- Duplicate trade ID handling.
+- Generated trade ID format and uniqueness.
 
 ### Deployment
 

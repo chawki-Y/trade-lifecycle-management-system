@@ -25,6 +25,8 @@ VALUES
     ('BTC/USD', 'Bitcoin vs US Dollar', 'Crypto', 'USD')
 ON CONFLICT (symbol) DO NOTHING;
 
+CREATE SEQUENCE IF NOT EXISTS trade_id_sequence START 1;
+
 CREATE TABLE IF NOT EXISTS trades (
     id SERIAL PRIMARY KEY,
     trade_id VARCHAR(50) NOT NULL UNIQUE,
