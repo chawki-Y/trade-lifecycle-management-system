@@ -108,15 +108,15 @@ Responsive capabilities include:
 
 ### Mobile Dashboard
 
-![Mobile Dashboard](screenshots/mobileView/mobile-view-1.png)
+![Mobile Dashboard](screenshots/mobileView/mobile-view-1.jpg)
 
 ### Mobile Trade Capture
 
-![Mobile Trade Capture](screenshots/mobileView/mobile-view-2.png)
+![Mobile Trade Capture](screenshots/mobileView/mobile-view-2.jpg)
 
 ### Mobile Market Overview
 
-![Mobile Market Overview](screenshots/mobileView/mobile-view-3.png)
+![Mobile Market Overview](screenshots/mobileView/mobile-view-3.jpg)
 
 
 
