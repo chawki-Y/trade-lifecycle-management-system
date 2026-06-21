@@ -63,13 +63,22 @@ async function createTrade(req, res) {
   let storedTradeId = null;
 
   try {
-    storedTradeId = await generateTradeId(storedTradeDate);
+    // Invalid reference data is rejected before insert so bad symbols never enter trades.
+    const instrumentExists = normalizedInstrument
+      ? await isActiveInstrument(normalizedInstrument)
+      : false;
 
-    if (!rejectionReason) {
-      // Instrument symbols are reference data; validate them server-side as well as in the UI.
-      const instrumentExists = await isActiveInstrument(normalizedInstrument);
-      rejectionReason = instrumentExists ? null : "Invalid or inactive instrument";
+    if (!instrumentExists) {
+      return res.status(400).json({
+        message: "Trade rejected: Invalid or inactive instrument.",
+        tradeId: null,
+        status: "REJECTED",
+        pnl: 0,
+        rejectionReason: "Invalid or inactive instrument"
+      });
     }
+
+    storedTradeId = await generateTradeId(storedTradeDate);
 
     const status = rejectionReason ? "REJECTED" : "VALID";
     const pnl = rejectionReason

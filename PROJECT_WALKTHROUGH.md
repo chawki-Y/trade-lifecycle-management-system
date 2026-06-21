@@ -52,16 +52,17 @@ When a user creates a trade from the frontend, this is what happens:
 11. `createTrade` in `src/controllers/tradeController.js` handles the request.
 12. The controller calls `validateTrade` from `src/services/validationService.js`.
 13. If basic validation passes, the controller checks that the instrument exists and is active in the `instruments` table.
-14. If validation fails, the trade is marked `REJECTED` and given a rejection reason.
-15. If validation passes, the controller calls `calculatePnL` from `src/services/pnlService.js`.
-16. The controller generates a trade ID using the pattern `TRD-YYYYMMDD-000001`, where `YYYYMMDD` comes from the trade date and the final number comes from a PostgreSQL sequence.
-17. The controller inserts the trade into PostgreSQL using a parameterized query.
-18. The backend returns a JSON response with message, generated trade ID, status, P&L, and rejection reason.
-19. The frontend shows the result message to the user.
-20. The frontend refreshes the dashboard by calling:
+14. If the instrument is invalid or inactive, the backend rejects the request before inserting it.
+15. If other validation fails for a valid instrument, the trade is marked `REJECTED` and stored with a rejection reason.
+16. If validation passes, the controller calls `calculatePnL` from `src/services/pnlService.js`.
+17. The controller generates a trade ID using the pattern `TRD-YYYYMMDD-000001`, where `YYYYMMDD` comes from the trade date and the final number comes from a PostgreSQL sequence.
+18. The controller inserts the trade into PostgreSQL using a parameterized query.
+19. The backend returns a JSON response with message, generated trade ID, status, P&L, and rejection reason.
+20. The frontend shows the result message to the user.
+21. The frontend refreshes the dashboard by calling:
     - `GET /api/trades/report`
     - `GET /api/trades`
-21. The summary metrics and latest trade table update on screen.
+22. The summary metrics and latest trade table update on screen.
 
 The important point is that the frontend does not calculate or trust business results by itself. The backend validates the submitted instrument against database reference data, calculates P&L, and persists the trade.
 
@@ -352,7 +353,7 @@ If the instrument does not exist or is inactive, the trade is rejected with:
 Invalid or inactive instrument
 ```
 
-Then the controller runs an `INSERT INTO trades (...) VALUES (...)` query using PostgreSQL placeholders `$1` through `$10`.
+Invalid or inactive instruments are not inserted into the `trades` table. If the instrument is valid, the controller runs an `INSERT INTO trades (...) VALUES (...)` query using PostgreSQL placeholders `$1` through `$10`.
 
 This stores:
 
@@ -542,7 +543,7 @@ Reference data is controlled master data used by financial systems. Instruments,
 
 For this project, the `instruments` table defines which products users are allowed to trade. This prevents users from entering random symbols and makes the application closer to real trading systems, where a trade must reference a known, active product.
 
-Frontend dropdown validation improves user experience, but backend validation is still required. A user can bypass the browser using Postman, curl, or another client. That is why the controller checks the selected instrument against PostgreSQL before accepting the trade.
+Frontend dropdown validation improves user experience, but backend validation is still required. A user can bypass the browser using Postman, curl, or another client. That is why the controller checks the selected instrument against PostgreSQL before accepting the trade, and invalid symbols are rejected before insert.
 
 ### `instruments` Table Columns
 

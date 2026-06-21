@@ -41,3 +41,30 @@ CREATE TABLE IF NOT EXISTS trades (
     rejection_reason VARCHAR(255) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Reset and seed demo trade data.
+-- This clears old local test trades but keeps the instrument reference data above.
+DELETE FROM trades;
+
+ALTER SEQUENCE trade_id_sequence RESTART WITH 1;
+
+INSERT INTO trades (
+    trade_id,
+    instrument,
+    trade_type,
+    quantity,
+    trade_price,
+    market_price,
+    pnl,
+    trade_date,
+    status,
+    rejection_reason
+)
+VALUES
+    ('TRD-20260621-000001', 'EUR/USD', 'BUY', 100000.00, 1.0800, 1.0825, 250.0000, '2026-06-21', 'VALID', NULL),
+    ('TRD-20260621-000002', 'AAPL', 'BUY', 50.00, 180.2500, 184.1000, 192.5000, '2026-06-21', 'VALID', NULL),
+    ('TRD-20260621-000003', 'MSFT', 'SELL', 40.00, 410.7500, 407.5000, 130.0000, '2026-06-21', 'VALID', NULL),
+    ('TRD-20260621-000004', 'XAU/USD', 'BUY', 10.00, 2320.0000, 2335.5000, 155.0000, '2026-06-21', 'VALID', NULL),
+    ('TRD-20260621-000005', 'TSLA', 'BUY', 0.00, 250.0000, 252.0000, 0.0000, '2026-06-21', 'REJECTED', 'quantity must be greater than 0');
+
+SELECT setval('trade_id_sequence', 5, TRUE);

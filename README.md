@@ -64,6 +64,14 @@ Returns active instruments from the PostgreSQL reference table.
 
 The frontend uses this endpoint to populate the instrument dropdown. The backend also validates submitted instruments against the same table, which simulates instrument/reference-data validation used in financial and trading systems.
 
+## Recommended Screenshots
+
+For GitHub presentation, add screenshots that show:
+
+- Dashboard summary with total trades, valid trades, rejected trades, and total P&L
+- Capture Trade form with the instrument dropdown loaded from PostgreSQL
+- Latest Trades table showing generated trade IDs, instruments, status, and P&L
+
 ## P&L Formula
 
 BUY:

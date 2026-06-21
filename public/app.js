@@ -142,7 +142,11 @@ tradeForm.addEventListener("submit", async (event) => {
       body: JSON.stringify(payload)
     });
 
-    setMessage(`${result.status}: ${result.message}`, result.status === "VALID" ? "success" : "error");
+    const resultMessage = result.status === "VALID"
+      ? `Trade ${result.tradeId} processed successfully.`
+      : `Trade rejected: ${result.rejectionReason || result.message}`;
+
+    setMessage(resultMessage, result.status === "VALID" ? "success" : "error");
     tradeForm.reset();
     document.querySelector("#tradeDate").valueAsDate = new Date();
     await refreshDashboard();
