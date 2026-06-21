@@ -5,7 +5,13 @@ const tradesTable = document.querySelector("#tradesTable");
 const tradeCount = document.querySelector("#tradeCount");
 const instrumentSelect = document.querySelector("#instrument");
 const submitButton = tradeForm.querySelector("button[type='submit']");
+const selectedInstrumentLabel = document.querySelector("#selectedInstrumentLabel");
+const marketPriceValue = document.querySelector("#marketPriceValue");
+const marketPriceUpdatedAt = document.querySelector("#marketPriceUpdatedAt");
+const marketPriceStatus = document.querySelector("#marketPriceStatus");
 let instrumentsLoaded = false;
+let latestMarketPrice = null;
+let marketPriceTimer = null;
 
 const metricEls = {
   totalTrades: document.querySelector("#totalTrades"),
@@ -31,6 +37,34 @@ function formatNumber(value) {
 function setMessage(message, type = "") {
   formMessage.textContent = message;
   formMessage.className = type;
+}
+
+function formatMarketPrice(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return "-";
+  }
+
+  return number.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6
+  });
+}
+
+function formatTime(value) {
+  if (!value) {
+    return "-";
+  }
+
+  return new Date(value).toLocaleTimeString();
+}
+
+function setMarketPriceState({ symbol = "-", price = null, timestamp = null, status = "" }) {
+  selectedInstrumentLabel.textContent = symbol;
+  marketPriceValue.textContent = price === null ? "-" : formatMarketPrice(price);
+  marketPriceUpdatedAt.textContent = formatTime(timestamp);
+  marketPriceStatus.textContent = status;
 }
 
 async function fetchJson(url, options) {
@@ -67,7 +101,7 @@ async function loadInstruments() {
 
     instrumentsLoaded = instruments.length > 0;
     instrumentSelect.disabled = !instrumentsLoaded;
-    submitButton.disabled = !instrumentsLoaded;
+    submitButton.disabled = true;
 
     if (!instrumentsLoaded) {
       setMessage("No active instruments are available.", "error");
@@ -78,6 +112,65 @@ async function loadInstruments() {
     submitButton.disabled = true;
     setMessage("Could not load instruments. Please refresh the page.", "error");
   }
+}
+
+async function loadMarketPrice(symbol) {
+  setMarketPriceState({
+    symbol,
+    price: latestMarketPrice,
+    timestamp: null,
+    status: "Loading..."
+  });
+
+  const marketData = await fetchJson(`/api/market-price/${encodeURIComponent(symbol)}`);
+  latestMarketPrice = marketData.marketPrice;
+
+  setMarketPriceState({
+    symbol: marketData.symbol,
+    price: marketData.marketPrice,
+    timestamp: marketData.timestamp,
+    status: marketData.cached ? "Cached price" : "Live price"
+  });
+}
+
+function stopMarketPriceRefresh() {
+  if (marketPriceTimer) {
+    clearInterval(marketPriceTimer);
+    marketPriceTimer = null;
+  }
+}
+
+async function startMarketPriceRefresh(symbol) {
+  stopMarketPriceRefresh();
+  latestMarketPrice = null;
+  submitButton.disabled = true;
+
+  try {
+    await loadMarketPrice(symbol);
+    submitButton.disabled = false;
+    setMessage("");
+  } catch (error) {
+    latestMarketPrice = null;
+    submitButton.disabled = true;
+    setMarketPriceState({
+      symbol,
+      status: "Market price unavailable"
+    });
+    setMessage("Market price is unavailable. Please try again later.", "error");
+    return;
+  }
+
+  marketPriceTimer = setInterval(async () => {
+    try {
+      await loadMarketPrice(symbol);
+    } catch (error) {
+      setMarketPriceState({
+        symbol,
+        price: latestMarketPrice,
+        status: "Using last available price"
+      });
+    }
+  }, 5000);
 }
 
 async function loadTrades() {
@@ -108,8 +201,8 @@ async function loadTrades() {
 }
 
 async function refreshDashboard() {
-  // The summary and table are independent reads, so they can load in parallel.
-  await Promise.all([loadReport(), loadTrades()]);
+  await loadTrades();
+  await loadReport();
 }
 
 tradeForm.addEventListener("submit", async (event) => {
@@ -117,6 +210,11 @@ tradeForm.addEventListener("submit", async (event) => {
 
   if (!instrumentsLoaded || !instrumentSelect.value) {
     setMessage("Please select a valid instrument.", "error");
+    return;
+  }
+
+  if (latestMarketPrice === null) {
+    setMessage("Please wait for the latest market price before submitting.", "error");
     return;
   }
 
@@ -129,7 +227,6 @@ tradeForm.addEventListener("submit", async (event) => {
     tradeType: formData.get("tradeType"),
     quantity: Number(formData.get("quantity")),
     tradePrice: Number(formData.get("tradePrice")),
-    marketPrice: Number(formData.get("marketPrice")),
     tradeDate: formData.get("tradeDate")
   };
 
@@ -149,6 +246,10 @@ tradeForm.addEventListener("submit", async (event) => {
     setMessage(resultMessage, result.status === "VALID" ? "success" : "error");
     tradeForm.reset();
     document.querySelector("#tradeDate").valueAsDate = new Date();
+    stopMarketPriceRefresh();
+    latestMarketPrice = null;
+    submitButton.disabled = true;
+    setMarketPriceState({ status: "Select an instrument" });
     await refreshDashboard();
   } catch (error) {
     setMessage(error.message, "error");
@@ -163,6 +264,21 @@ refreshButton.addEventListener("click", async () => {
   } catch (error) {
     setMessage(error.message, "error");
   }
+});
+
+instrumentSelect.addEventListener("change", async () => {
+  const symbol = instrumentSelect.value;
+
+  stopMarketPriceRefresh();
+  latestMarketPrice = null;
+
+  if (!symbol) {
+    submitButton.disabled = true;
+    setMarketPriceState({ status: "Select an instrument" });
+    return;
+  }
+
+  await startMarketPriceRefresh(symbol);
 });
 
 refreshDashboard().catch((error) => {

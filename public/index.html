@@ -35,6 +35,27 @@
         </article>
       </section>
 
+      <section class="panel market-panel" aria-label="Live market price">
+        <div class="section-heading">
+          <h2>Market Price</h2>
+          <span id="marketPriceStatus">Select an instrument</span>
+        </div>
+        <div class="market-grid">
+          <div>
+            <span>Selected Instrument</span>
+            <strong id="selectedInstrumentLabel">-</strong>
+          </div>
+          <div>
+            <span>Current Market Price</span>
+            <strong id="marketPriceValue">-</strong>
+          </div>
+          <div>
+            <span>Last Updated</span>
+            <strong id="marketPriceUpdatedAt">-</strong>
+          </div>
+        </div>
+      </section>
+
       <section class="panel form-panel">
         <div class="section-heading">
           <h2>Capture Trade</h2>
@@ -65,11 +86,6 @@
           <label>
             Trade Price
             <input id="tradePrice" name="tradePrice" type="number" min="0.0001" step="0.0001" placeholder="180.25" required />
-          </label>
-
-          <label>
-            Market Price
-            <input id="marketPrice" name="marketPrice" type="number" min="0.0001" step="0.0001" placeholder="184.10" required />
           </label>
 
           <label>

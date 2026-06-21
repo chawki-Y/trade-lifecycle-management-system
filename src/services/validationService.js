@@ -16,10 +16,6 @@ function validateTrade(trade) {
     return "tradePrice must be greater than 0";
   }
 
-  if (Number(trade.marketPrice) <= 0 || Number.isNaN(Number(trade.marketPrice))) {
-    return "marketPrice must be greater than 0";
-  }
-
   if (!trade.tradeDate) {
     return "tradeDate is required";
   }

@@ -1,6 +1,7 @@
 const { pool } = require("../config/db");
 const { calculatePnL } = require("../services/pnlService");
 const { validateTrade } = require("../services/validationService");
+const { getLatestMarketPrice } = require("../services/marketDataService");
 
 function formatDateForTradeId(dateValue) {
   const date = new Date(dateValue);
@@ -34,13 +35,60 @@ async function isActiveInstrument(symbol) {
   return result.rowCount > 0;
 }
 
+async function refreshValidTradesMarketPrices() {
+  const result = await pool.query(`
+    SELECT
+      id,
+      instrument,
+      trade_type,
+      quantity,
+      trade_price,
+      market_price,
+      pnl
+    FROM trades
+    WHERE status = 'VALID'
+  `);
+
+  for (const trade of result.rows) {
+    try {
+      const marketData = await getLatestMarketPrice(trade.instrument);
+      const pnl = calculatePnL(
+        trade.trade_type,
+        trade.quantity,
+        trade.trade_price,
+        marketData.marketPrice
+      );
+
+      await pool.query(
+        `
+          UPDATE trades
+          SET
+            market_price = $1,
+            pnl = $2,
+            last_price_updated_at = $3,
+            market_data_source = $4
+          WHERE id = $5
+        `,
+        [
+          marketData.marketPrice,
+          pnl,
+          marketData.timestamp,
+          marketData.source,
+          trade.id
+        ]
+      );
+    } catch (error) {
+      console.warn(`Market price refresh skipped for ${trade.instrument}: ${error.message}`);
+    }
+  }
+}
+
 async function createTrade(req, res) {
   const {
     instrument,
     tradeType,
     quantity,
     tradePrice,
-    marketPrice,
     tradeDate
   } = req.body;
 
@@ -51,7 +99,6 @@ async function createTrade(req, res) {
     tradeType: normalizedTradeType,
     quantity,
     tradePrice,
-    marketPrice,
     tradeDate
   };
 
@@ -78,12 +125,29 @@ async function createTrade(req, res) {
       });
     }
 
+    let marketData = null;
+
+    if (!rejectionReason) {
+      try {
+        marketData = await getLatestMarketPrice(normalizedInstrument);
+      } catch (error) {
+        return res.status(502).json({
+          message: "Unable to retrieve market price",
+          tradeId: null,
+          status: "REJECTED",
+          pnl: 0,
+          rejectionReason: error.message
+        });
+      }
+    }
+
     storedTradeId = await generateTradeId(storedTradeDate);
 
     const status = rejectionReason ? "REJECTED" : "VALID";
+    const storedMarketPrice = marketData ? marketData.marketPrice : 0;
     const pnl = rejectionReason
       ? 0
-      : calculatePnL(normalizedTradeType, quantity, tradePrice, marketPrice);
+      : calculatePnL(normalizedTradeType, quantity, tradePrice, storedMarketPrice);
 
     // PostgreSQL placeholders keep user input separate from SQL text.
     await pool.query(
@@ -98,7 +162,9 @@ async function createTrade(req, res) {
           pnl,
           trade_date,
           status,
-          rejection_reason
+          rejection_reason,
+          last_price_updated_at,
+          market_data_source
         )
         VALUES (
           $1,
@@ -110,7 +176,9 @@ async function createTrade(req, res) {
           $7,
           $8,
           $9,
-          $10
+          $10,
+          $11,
+          $12
         )
       `,
       [
@@ -119,11 +187,13 @@ async function createTrade(req, res) {
         storedTradeType,
         Number(quantity) || 0,
         Number(tradePrice) || 0,
-        Number(marketPrice) || 0,
+        storedMarketPrice,
         pnl,
         storedTradeDate,
         status,
-        rejectionReason
+        rejectionReason,
+        marketData ? marketData.timestamp : null,
+        marketData ? marketData.source : null
       ]
     );
 
@@ -131,6 +201,7 @@ async function createTrade(req, res) {
       message: rejectionReason ? "Trade rejected and stored" : "Trade captured successfully",
       tradeId: storedTradeId,
       status,
+      marketPrice: storedMarketPrice,
       pnl,
       rejectionReason
     });
@@ -155,6 +226,8 @@ async function createTrade(req, res) {
 
 async function getTrades(req, res) {
   try {
+    await refreshValidTradesMarketPrices();
+
     const result = await pool.query(`
       SELECT
         id AS "Id",
@@ -168,6 +241,8 @@ async function getTrades(req, res) {
         trade_date AS "TradeDate",
         status AS "Status",
         rejection_reason AS "RejectionReason",
+        last_price_updated_at AS "LastPriceUpdatedAt",
+        market_data_source AS "MarketDataSource",
         created_at AS "CreatedAt"
       FROM trades
       ORDER BY created_at DESC
