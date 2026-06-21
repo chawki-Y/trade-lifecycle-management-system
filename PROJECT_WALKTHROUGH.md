@@ -6,9 +6,9 @@ This document explains the Trade Processing System as if you built it and need t
 
 ### What Problem This App Solves
 
-The app solves a simplified version of a common financial operations problem: capturing trades, validating them, calculating profit and loss, storing the results, and reporting on trade activity.
+The app solves a simplified version of a common financial operations problem: capturing trades, validating them against reference data, calculating profit and loss, storing the results, and reporting on trade activity.
 
-Instead of manually inserting trade records into a database, users can enter trades through a dashboard. The backend applies business rules, calculates P&L, and stores both valid and rejected trades in PostgreSQL. The dashboard then shows trade history and summary metrics.
+Instead of manually inserting trade records into a database, users can enter trades through a dashboard. The instrument is selected from a PostgreSQL-backed reference table, which is closer to how real financial systems control valid products. The backend applies business rules, calculates P&L, and stores both valid and rejected trades in PostgreSQL. The dashboard then shows trade history and summary metrics.
 
 ### Why Trade Processing Matters
 
@@ -27,6 +27,7 @@ Bad trade data can cause incorrect reports, settlement issues, risk errors, or f
 Systems such as Murex, Calypso, and other banking platforms handle trade capture, lifecycle management, risk, P&L, and reporting at a much larger scale. This project is not a full trading platform, but it demonstrates the same core ideas in a simplified way:
 
 - Trades are captured through a user interface.
+- Instruments are controlled through reference data.
 - Backend rules decide whether a trade is valid.
 - Financial logic calculates P&L.
 - A relational database stores trade records.
@@ -39,25 +40,29 @@ In an interview, you can describe this as a mini capital markets workflow that s
 When a user creates a trade from the frontend, this is what happens:
 
 1. The user opens the dashboard at `/`.
-2. The user fills the trade form with trade ID, instrument, trade type, quantity, trade price, market price, and trade date.
-3. `public/app.js` listens for the form submission.
-4. The frontend builds a JSON payload matching the backend API contract.
-5. The frontend sends a `POST /api/trades` request using `fetch`.
-6. Express receives the request in `src/server.js`.
-7. The request is routed through `src/routes/tradeRoutes.js`.
-8. `createTrade` in `src/controllers/tradeController.js` handles the request.
-9. The controller calls `validateTrade` from `src/services/validationService.js`.
-10. If validation fails, the trade is marked `REJECTED` and given a rejection reason.
-11. If validation passes, the controller calls `calculatePnL` from `src/services/pnlService.js`.
-12. The controller inserts the trade into PostgreSQL using a parameterized query.
-13. The backend returns a JSON response with message, trade ID, status, P&L, and rejection reason.
-14. The frontend shows the result message to the user.
-15. The frontend refreshes the dashboard by calling:
+2. `public/app.js` calls `GET /api/instruments`.
+3. The backend reads active instruments from the PostgreSQL `instruments` reference table.
+4. The frontend populates the instrument dropdown with valid symbols.
+5. The user fills the trade form with trade ID, selected instrument, trade type, quantity, trade price, market price, and trade date.
+6. `public/app.js` listens for the form submission.
+7. The frontend builds a JSON payload matching the backend API contract.
+8. The frontend sends a `POST /api/trades` request using `fetch`.
+9. Express receives the request in `src/server.js`.
+10. The request is routed through `src/routes/tradeRoutes.js`.
+11. `createTrade` in `src/controllers/tradeController.js` handles the request.
+12. The controller calls `validateTrade` from `src/services/validationService.js`.
+13. If basic validation passes, the controller checks that the instrument exists and is active in the `instruments` table.
+14. If validation fails, the trade is marked `REJECTED` and given a rejection reason.
+15. If validation passes, the controller calls `calculatePnL` from `src/services/pnlService.js`.
+16. The controller inserts the trade into PostgreSQL using a parameterized query.
+17. The backend returns a JSON response with message, trade ID, status, P&L, and rejection reason.
+18. The frontend shows the result message to the user.
+19. The frontend refreshes the dashboard by calling:
     - `GET /api/trades/report`
     - `GET /api/trades`
-16. The summary metrics and latest trade table update on screen.
+20. The summary metrics and latest trade table update on screen.
 
-The important point is that the frontend does not calculate or trust business results by itself. The backend validates, calculates, and persists the trade.
+The important point is that the frontend does not calculate or trust business results by itself. The backend validates the submitted instrument against database reference data, calculates P&L, and persists the trade.
 
 ## 3. File-by-File Explanation
 
@@ -67,7 +72,7 @@ This is the frontend page served by Express. It defines the dashboard structure:
 
 - Header with the app name and refresh button.
 - Summary metric cards for total trades, valid trades, rejected trades, and total P&L.
-- Trade capture form.
+- Trade capture form with an instrument dropdown.
 - Latest trades table.
 
 It does not contain business logic. It provides the HTML elements that `app.js` reads from and updates.
@@ -93,6 +98,8 @@ This is the frontend behavior layer.
 Key responsibilities:
 
 - Reads form input.
+- Loads active instruments from `GET /api/instruments`.
+- Populates the instrument dropdown from PostgreSQL-backed reference data.
 - Builds the JSON payload for `POST /api/trades`.
 - Sends API requests using `fetch`.
 - Loads dashboard metrics from `GET /api/trades/report`.
@@ -115,6 +122,7 @@ Key responsibilities:
 - Serves static frontend files from `public/`.
 - Serves the dashboard at `/`.
 - Registers the trade API routes under `/api/trades`.
+- Registers the instrument API routes under `/api/instruments`.
 - Starts the server on the configured port.
 
 This file is the bridge between the frontend and backend API.
@@ -149,6 +157,31 @@ Because `server.js` mounts this router at `/api/trades`, the final URLs are:
 - `GET /api/trades/report`
 
 This keeps route definitions separate from controller logic.
+
+### `src/routes/instrumentRoutes.js`
+
+This file defines the instrument reference-data route.
+
+Routes:
+
+- `GET /` maps to `getInstruments`.
+
+Because `server.js` mounts this router at `/api/instruments`, the final URL is:
+
+- `GET /api/instruments`
+
+### `src/controllers/instrumentController.js`
+
+This controller reads active instrument reference data from PostgreSQL.
+
+Key responsibilities:
+
+- Query the `instruments` table.
+- Return only active instruments.
+- Order results by asset class and symbol.
+- Return a clean error response if the query fails.
+
+This keeps reference-data retrieval separate from trade-processing logic.
 
 ### `src/controllers/tradeController.js`
 
@@ -205,11 +238,13 @@ It checks:
 
 It returns a rejection reason string if invalid, or `null` if valid.
 
+Instrument existence is then checked in the controller against the PostgreSQL `instruments` table because that check requires a database query.
+
 ### `database.sql`
 
 This file defines the PostgreSQL table structure.
 
-It creates the `trades` table if it does not already exist. This table stores trade details, calculated P&L, validation status, rejection reason, and creation timestamp.
+It creates the `instruments` table and the `trades` table if they do not already exist. It also seeds sample active instruments such as FX pairs, equities, gold, and Bitcoin. The `trades` table stores trade details, calculated P&L, validation status, rejection reason, and creation timestamp.
 
 It is useful for setting up the database on a new machine.
 
@@ -299,7 +334,23 @@ Creates a new trade, validates it, calculates P&L if valid, stores it in Postgre
 
 #### Database Action
 
-Runs an `INSERT INTO trades (...) VALUES (...)` query using PostgreSQL placeholders `$1` through `$10`.
+Before inserting, the backend checks the selected instrument against the `instruments` table:
+
+```sql
+SELECT 1
+FROM instruments
+WHERE symbol = $1
+  AND is_active = TRUE
+LIMIT 1
+```
+
+If the instrument does not exist or is inactive, the trade is rejected with:
+
+```text
+Invalid or inactive instrument
+```
+
+Then the controller runs an `INSERT INTO trades (...) VALUES (...)` query using PostgreSQL placeholders `$1` through `$10`.
 
 This stores:
 
@@ -429,18 +480,96 @@ Runs an aggregate SQL query:
 }
 ```
 
+### GET `/api/instruments`
+
+#### Purpose
+
+Returns active instruments from PostgreSQL reference data. The frontend uses this endpoint to populate the instrument dropdown.
+
+#### Request Body
+
+No request body.
+
+#### Backend Function Called
+
+`getInstruments` in `src/controllers/instrumentController.js`.
+
+#### Database Query
+
+Runs a `SELECT` query from the `instruments` table:
+
+```sql
+SELECT id, symbol, name, asset_class, currency
+FROM instruments
+WHERE is_active = TRUE
+ORDER BY asset_class, symbol
+```
+
+#### Example Response
+
+```json
+[
+  {
+    "id": 1,
+    "symbol": "EUR/USD",
+    "name": "Euro vs US Dollar",
+    "asset_class": "FX",
+    "currency": "USD"
+  }
+]
+```
+
 ## 5. Database Explanation
 
 ### PostgreSQL Role in the Project
 
 PostgreSQL is the persistent storage layer. It stores all captured trades so the application can:
 
+- Maintain instrument reference data.
 - Show trade history.
 - Produce reports.
 - Preserve valid and rejected records.
 - Avoid losing data when the server restarts.
 
 The backend uses the `pg` package to communicate with PostgreSQL.
+
+### Why Reference Data Matters
+
+Reference data is controlled master data used by financial systems. Instruments, currencies, counterparties, books, and calendars are common examples.
+
+For this project, the `instruments` table defines which products users are allowed to trade. This prevents users from entering random symbols and makes the application closer to real trading systems, where a trade must reference a known, active product.
+
+Frontend dropdown validation improves user experience, but backend validation is still required. A user can bypass the browser using Postman, curl, or another client. That is why the controller checks the selected instrument against PostgreSQL before accepting the trade.
+
+### `instruments` Table Columns
+
+#### `id`
+
+Auto-generated primary key for the instrument record.
+
+#### `symbol`
+
+The unique tradeable symbol, such as `EUR/USD`, `AAPL`, or `BTC/USD`.
+
+#### `name`
+
+Readable instrument name, such as `Apple Inc.` or `Euro vs US Dollar`.
+
+#### `asset_class`
+
+Groups instruments into business categories such as FX, Equity, Commodity, or Crypto.
+
+#### `currency`
+
+The main currency used for the instrument.
+
+#### `is_active`
+
+Controls whether the instrument can currently be selected and traded. Inactive instruments are hidden from the dropdown and rejected by the backend.
+
+#### `created_at`
+
+Timestamp showing when the instrument record was created.
 
 ### `trades` Table Columns
 
@@ -454,7 +583,7 @@ Business identifier for the trade. It is unique because a trade should not be ca
 
 #### `instrument`
 
-The traded product or symbol, such as `AAPL`, `MSFT`, or another financial instrument.
+The traded product or symbol, such as `AAPL`, `EUR/USD`, or another financial instrument. The backend validates this value against the active `instruments` reference table.
 
 #### `trade_type`
 
@@ -530,6 +659,7 @@ The validation service checks that:
 
 - Trade ID is present.
 - Instrument is present.
+- Instrument exists in the active PostgreSQL reference-data table.
 - Trade type is either BUY or SELL.
 - Quantity is greater than zero.
 - Trade price is greater than zero.
@@ -537,6 +667,8 @@ The validation service checks that:
 - Trade date is present.
 
 If any rule fails, the function returns the first rejection reason. If all rules pass, it returns `null`.
+
+The active instrument check is intentionally done on the backend. Even though the frontend dropdown only shows valid instruments, users can bypass the UI and call the API directly.
 
 ### BUY P&L Formula
 
@@ -590,13 +722,13 @@ P&L measures the economic difference between the trade price and the market pric
 
 ### 30-Second Explanation
 
-I built a full-stack trade-processing system using Node.js, Express, PostgreSQL, and a simple JavaScript frontend. Users can enter trades, and the backend validates the data, calculates BUY/SELL P&L, stores the trade with a valid or rejected status, and exposes reporting metrics on a dashboard. The project demonstrates REST API design, SQL storage, business rules, and financial calculation logic.
+I built a full-stack trade-processing system using Node.js, Express, PostgreSQL, and a simple JavaScript frontend. Users can select valid instruments from PostgreSQL reference data, enter trades, and the backend validates the data, calculates BUY/SELL P&L, stores the trade with a valid or rejected status, and exposes reporting metrics on a dashboard. The project demonstrates REST API design, SQL storage, reference-data validation, business rules, and financial calculation logic.
 
 ### 2-Minute Explanation
 
-This project simulates a simplified capital markets trade workflow. The frontend provides a dashboard where a user enters a trade with fields like trade ID, instrument, trade type, quantity, trade price, market price, and trade date.
+This project simulates a simplified capital markets trade workflow. The frontend provides a dashboard where a user selects an instrument from a dropdown and enters a trade with fields like trade ID, trade type, quantity, trade price, market price, and trade date.
 
-When the user submits the form, the frontend sends a JSON request to an Express API. The backend controller receives the request, normalizes the trade type, validates required fields and numeric values, calculates P&L if the trade is valid, and saves the trade into PostgreSQL using a parameterized query.
+The dropdown is populated from `GET /api/instruments`, which reads active instruments from PostgreSQL. When the user submits the form, the frontend sends a JSON request to an Express API. The backend controller receives the request, normalizes the trade type, validates required fields and numeric values, checks that the instrument exists and is active in the database, calculates P&L if the trade is valid, and saves the trade into PostgreSQL using a parameterized query.
 
 The system stores both valid and rejected trades. Valid trades include calculated P&L, while rejected trades include a rejection reason. The reporting endpoint uses SQL aggregation to calculate total trades, valid trades, rejected trades, and total P&L for valid trades only. The frontend calls those endpoints and updates the dashboard.
 
@@ -608,11 +740,11 @@ The app uses Express as the HTTP server, `pg` for PostgreSQL access, and dotenv 
 
 The trade creation flow uses a controller-service pattern. `tradeRoutes.js` maps HTTP routes to controller functions. `tradeController.js` orchestrates validation, P&L calculation, and SQL persistence. `validationService.js` keeps validation rules isolated. `pnlService.js` keeps financial calculation logic isolated.
 
-PostgreSQL queries use parameterized placeholders to reduce SQL injection risk. Reports are calculated with SQL aggregate functions and conditional `CASE` statements. The frontend uses plain HTML, CSS, and JavaScript to keep the UI lightweight and easy to deploy from the same Express server.
+PostgreSQL queries use parameterized placeholders to reduce SQL injection risk. The app also uses PostgreSQL as a reference-data source for instruments, and the backend validates submitted instrument symbols against that table. Reports are calculated with SQL aggregate functions and conditional `CASE` statements. The frontend uses plain HTML, CSS, and JavaScript to keep the UI lightweight and easy to deploy from the same Express server.
 
 ### Business/Finance Explanation
 
-From a finance perspective, the app models the first steps of a trade lifecycle. A trade is captured, checked against basic business rules, valued using market price, and stored for reporting.
+From a finance perspective, the app models the first steps of a trade lifecycle. A trade is captured, checked against instrument reference data and basic business rules, valued using market price, and stored for reporting.
 
 For BUY trades, P&L improves when market price rises above trade price. For SELL trades, P&L improves when market price falls below trade price. The report gives an operations-style view of trade volume, rejected records, and total valid P&L.
 
@@ -666,37 +798,41 @@ After a trade is submitted, the frontend calls `GET /api/trades/report` and `GET
 
 ### 12. What validation rules are implemented?
 
-The app checks required trade ID, required instrument, valid BUY/SELL trade type, quantity greater than zero, prices greater than zero, and required trade date.
+The app checks required trade ID, required instrument, valid active instrument in PostgreSQL reference data, valid BUY/SELL trade type, quantity greater than zero, prices greater than zero, and required trade date.
 
-### 13. What error handling exists?
+### 13. Why is backend instrument validation required if the frontend has a dropdown?
+
+Frontend validation is only for user experience. A user can bypass the browser and call `POST /api/trades` directly from Postman or curl. The backend must validate the instrument against PostgreSQL to protect data quality.
+
+### 14. What error handling exists?
 
 The API handles duplicate trade IDs with a `409` response and general database/server failures with a `500` response. The frontend catches failed requests and displays an error message.
 
-### 14. What security improvements would you add?
+### 15. What security improvements would you add?
 
 I would add authentication, role-based authorization, rate limiting, stronger input sanitization, better CORS configuration, HTTPS in production, and secure secret management.
 
-### 15. How would you test this project?
+### 16. How would you test this project?
 
-I would add unit tests for validation and P&L services, integration tests for API endpoints, and database tests for insert/report behavior. I would also test duplicate trade IDs and rejected trade scenarios.
+I would add unit tests for validation and P&L services, integration tests for API endpoints, and database tests for insert/report behavior. I would also test duplicate trade IDs, rejected trade scenarios, inactive instruments, and invalid instrument symbols submitted through Postman.
 
-### 16. Why use a connection pool?
+### 17. Why use a connection pool?
 
 A pool reuses database connections instead of creating a new connection for every request. This improves performance and resource usage.
 
-### 17. How would you improve reporting?
+### 18. How would you improve reporting?
 
 I would add reports by instrument, trade date, status, and daily P&L. I could also add SQL views or stored procedures for more advanced reporting.
 
-### 18. How does this relate to Murex-style systems?
+### 19. How does this relate to Murex-style systems?
 
-It models a small part of the same workflow: trade capture, validation, valuation/P&L, persistence, and reporting. Real platforms are much larger, but the core concepts are similar.
+It models a small part of the same workflow: trade capture, reference-data validation, valuation/P&L, persistence, and reporting. Real platforms are much larger, but the core concepts are similar.
 
-### 19. Why serve the frontend from Express?
+### 20. Why serve the frontend from Express?
 
 For this portfolio project, serving the frontend from Express keeps deployment simple. One server hosts both the dashboard and API. In a larger system, the frontend could be a separate React app.
 
-### 20. What is missing for production readiness?
+### 21. What is missing for production readiness?
 
 Authentication, audit logging, detailed trade lifecycle states, tests, structured logging, monitoring, deployment configuration, migrations, and stronger error handling.
 

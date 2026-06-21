@@ -2,7 +2,7 @@
 
 A full-stack mini trade-processing system that simulates a simplified capital markets workflow.
 
-The application allows users to enter financial trades, validate trade data, calculate profit/loss, store trades in PostgreSQL, and view trade reporting metrics from a simple dashboard.
+The application allows users to enter financial trades, select valid instruments from PostgreSQL reference data, validate trade data, calculate profit/loss, store trades in PostgreSQL, and view trade reporting metrics from a simple dashboard.
 
 ## Purpose
 
@@ -11,7 +11,10 @@ This project was built to demonstrate backend API development, SQL/database desi
 ## Features
 
 - Create financial trades
+- Load active instruments from a PostgreSQL reference table
+- Select instruments from a frontend dropdown
 - Validate trade input data
+- Validate submitted instruments against backend reference data
 - Calculate P&L for BUY and SELL trades
 - Store trade records in PostgreSQL
 - Display trade history
@@ -46,6 +49,12 @@ Returns trade reporting metrics:
 - Rejected trades
 - Total P&L
 
+### GET `/api/instruments`
+
+Returns active instruments from the PostgreSQL reference table.
+
+The frontend uses this endpoint to populate the instrument dropdown. The backend also validates submitted instruments against the same table, which simulates instrument/reference-data validation used in financial and trading systems.
+
 ## P&L Formula
 
 BUY:
@@ -72,8 +81,10 @@ trade-processing-system/
 |   |-- config/
 |   |   `-- db.js
 |   |-- controllers/
+|   |   |-- instrumentController.js
 |   |   `-- tradeController.js
 |   |-- routes/
+|   |   |-- instrumentRoutes.js
 |   |   `-- tradeRoutes.js
 |   |-- services/
 |   |   |-- pnlService.js

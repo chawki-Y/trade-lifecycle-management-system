@@ -49,7 +49,9 @@
 
           <label>
             Instrument
-            <input id="instrument" name="instrument" type="text" placeholder="AAPL" required />
+            <select id="instrument" name="instrument" required disabled>
+              <option value="">Select instrument</option>
+            </select>
           </label>
 
           <label>
@@ -80,7 +82,7 @@
             <input id="tradeDate" name="tradeDate" type="date" required />
           </label>
 
-          <button class="primary-button" type="submit">Submit Trade</button>
+          <button class="primary-button" type="submit" disabled>Submit Trade</button>
         </form>
       </section>
 

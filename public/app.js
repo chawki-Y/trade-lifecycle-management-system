@@ -3,6 +3,9 @@ const refreshButton = document.querySelector("#refreshButton");
 const formMessage = document.querySelector("#formMessage");
 const tradesTable = document.querySelector("#tradesTable");
 const tradeCount = document.querySelector("#tradeCount");
+const instrumentSelect = document.querySelector("#instrument");
+const submitButton = tradeForm.querySelector("button[type='submit']");
+let instrumentsLoaded = false;
 
 const metricEls = {
   totalTrades: document.querySelector("#totalTrades"),
@@ -49,6 +52,34 @@ async function loadReport() {
   metricEls.totalPnl.textContent = formatNumber(report.TotalPnL ?? 0);
 }
 
+async function loadInstruments() {
+  try {
+    const instruments = await fetchJson("/api/instruments");
+
+    instrumentSelect.innerHTML = `<option value="">Select instrument</option>`;
+
+    instruments.forEach((instrument) => {
+      const option = document.createElement("option");
+      option.value = instrument.symbol;
+      option.textContent = `${instrument.symbol} - ${instrument.name} (${instrument.asset_class})`;
+      instrumentSelect.appendChild(option);
+    });
+
+    instrumentsLoaded = instruments.length > 0;
+    instrumentSelect.disabled = !instrumentsLoaded;
+    submitButton.disabled = !instrumentsLoaded;
+
+    if (!instrumentsLoaded) {
+      setMessage("No active instruments are available.", "error");
+    }
+  } catch (error) {
+    instrumentsLoaded = false;
+    instrumentSelect.disabled = true;
+    submitButton.disabled = true;
+    setMessage("Could not load instruments. Please refresh the page.", "error");
+  }
+}
+
 async function loadTrades() {
   const trades = await fetchJson("/api/trades");
   tradeCount.textContent = `${trades.length} ${trades.length === 1 ? "row" : "rows"}`;
@@ -83,13 +114,19 @@ async function refreshDashboard() {
 
 tradeForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+
+  if (!instrumentsLoaded || !instrumentSelect.value) {
+    setMessage("Please select a valid instrument.", "error");
+    return;
+  }
+
   setMessage("Submitting trade...");
 
   const formData = new FormData(tradeForm);
   // Match the JSON shape expected by POST /api/trades.
   const payload = {
     tradeId: formData.get("tradeId").trim(),
-    instrument: formData.get("instrument").trim().toUpperCase(),
+    instrument: formData.get("instrument"),
     tradeType: formData.get("tradeType"),
     quantity: Number(formData.get("quantity")),
     tradePrice: Number(formData.get("tradePrice")),
@@ -126,5 +163,9 @@ refreshButton.addEventListener("click", async () => {
 });
 
 refreshDashboard().catch((error) => {
+  setMessage(error.message, "error");
+});
+
+loadInstruments().catch((error) => {
   setMessage(error.message, "error");
 });

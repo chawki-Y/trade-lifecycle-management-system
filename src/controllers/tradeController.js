@@ -2,6 +2,21 @@ const { pool } = require("../config/db");
 const { calculatePnL } = require("../services/pnlService");
 const { validateTrade } = require("../services/validationService");
 
+async function isActiveInstrument(symbol) {
+  const result = await pool.query(
+    `
+      SELECT 1
+      FROM instruments
+      WHERE symbol = $1
+        AND is_active = TRUE
+      LIMIT 1
+    `,
+    [symbol]
+  );
+
+  return result.rowCount > 0;
+}
+
 async function createTrade(req, res) {
   const {
     tradeId,
@@ -13,10 +28,11 @@ async function createTrade(req, res) {
     tradeDate
   } = req.body;
 
+  const normalizedInstrument = String(instrument || "").trim().toUpperCase();
   const normalizedTradeType = String(tradeType || "").toUpperCase();
   const trade = {
     tradeId,
-    instrument,
+    instrument: normalizedInstrument,
     tradeType: normalizedTradeType,
     quantity,
     tradePrice,
@@ -24,19 +40,25 @@ async function createTrade(req, res) {
     tradeDate
   };
 
-  const rejectionReason = validateTrade(trade);
-  const status = rejectionReason ? "REJECTED" : "VALID";
-  const pnl = rejectionReason
-    ? 0
-    : calculatePnL(normalizedTradeType, quantity, tradePrice, marketPrice);
-
+  let rejectionReason = validateTrade(trade);
   // Rejected trades are still stored so operations/reporting can see failed captures.
   const storedTradeId = tradeId || `MISSING-TRADE-ID-${Date.now()}`;
-  const storedInstrument = instrument || "UNKNOWN";
+  const storedInstrument = normalizedInstrument || "UNKNOWN";
   const storedTradeType = normalizedTradeType || "INVALID";
   const storedTradeDate = tradeDate || new Date();
 
   try {
+    if (!rejectionReason) {
+      // Instrument symbols are reference data; validate them server-side as well as in the UI.
+      const instrumentExists = await isActiveInstrument(normalizedInstrument);
+      rejectionReason = instrumentExists ? null : "Invalid or inactive instrument";
+    }
+
+    const status = rejectionReason ? "REJECTED" : "VALID";
+    const pnl = rejectionReason
+      ? 0
+      : calculatePnL(normalizedTradeType, quantity, tradePrice, marketPrice);
+
     // PostgreSQL placeholders keep user input separate from SQL text.
     await pool.query(
       `

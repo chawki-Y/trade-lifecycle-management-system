@@ -4,6 +4,7 @@ const path = require("path");
 require("dotenv").config();
 
 const tradeRoutes = require("./routes/tradeRoutes");
+const instrumentRoutes = require("./routes/instrumentRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -22,6 +23,7 @@ app.get("/api/health", (req, res) => {
 });
 
 app.use("/api/trades", tradeRoutes);
+app.use("/api/instruments", instrumentRoutes);
 
 app.listen(PORT, () => {
   console.log(`Trade Processing System API listening on port ${PORT}`);
