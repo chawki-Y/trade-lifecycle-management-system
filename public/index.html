@@ -12,7 +12,7 @@
         <p class="eyebrow">Fintech Operations</p>
         <h1>Trade Lifecycle Management System</h1>
       </div>
-      <button id="refreshButton" class="secondary-button" type="button">Refresh</button>
+      <button id="refreshButton" class="secondary-button" type="button">Refresh Trade P&L</button>
     </header>
 
     <main class="layout">
@@ -38,7 +38,10 @@
       <section class="panel market-panel" aria-label="Live market price">
         <div class="section-heading">
           <h2>Market Price</h2>
-          <span id="marketPriceStatus">Select an instrument</span>
+          <div class="section-actions">
+            <span id="marketPriceStatus">Select an instrument</span>
+            <button id="refreshMarketPriceButton" class="secondary-button" type="button" disabled>Refresh Market Price</button>
+          </div>
         </div>
         <div class="market-grid">
           <div>

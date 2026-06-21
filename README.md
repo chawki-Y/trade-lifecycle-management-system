@@ -16,7 +16,8 @@ This project was built to demonstrate backend API development, SQL/database desi
 - Select instruments from a frontend dropdown
 - Fetch latest market prices from a configurable market data provider
 - View a Market Overview watchlist for all active instruments
-- Refresh the selected instrument market price every 5 seconds
+- Refresh selected instrument market price on demand
+- Refresh trade P&L and market prices on demand
 - Validate trade input data
 - Validate submitted instruments against backend reference data
 - Calculate P&L for BUY and SELL trades
@@ -123,9 +124,9 @@ The dashboard behaves like a simplified trading workstation:
 - The Market Overview refresh button reloads prices through the backend cache and does not bypass rate-limit protection.
 - User selects an instrument from the dropdown.
 - The frontend calls `GET /api/market-price/:symbol`.
-- The current market price card updates immediately.
-- The selected instrument price refreshes every 5 seconds.
-- If the user switches instruments, the previous timer stops and a new timer starts.
+- The current market price card updates once when the instrument is selected.
+- The user can click Refresh Market Price to refresh only the selected instrument.
+- The user can click Refresh Trade P&L to refresh stored trade prices and recalculate P&L.
 - When a trade is submitted, the backend fetches the latest available market price and uses it to calculate P&L.
 - When `GET /api/trades` is called, valid trades attempt to refresh their market price and recalculate P&L.
 
@@ -135,7 +136,7 @@ Cache behavior:
 
 - Stocks and crypto use a 60-second cache.
 - FX pairs and commodities use a 120-second cache.
-- The frontend can refresh every 5 seconds, but repeated backend requests reuse cached prices while the cache is valid.
+- Price refreshes are user-triggered, and repeated backend requests reuse cached prices while the cache is valid.
 - `timestamp` shows when the quote was last fetched from the provider. `checkedAt` shows when the backend last checked for a price, so it changes on every frontend refresh even when the quote comes from cache.
 - If the provider fails and a stale cached price exists, the backend returns the stale cached price instead of crashing.
 - When refreshing the trades table, the backend fetches one price per unique instrument and reuses it for all trades with that instrument.
@@ -147,7 +148,7 @@ MARKET_DATA_PROVIDER=twelvedata
 MARKET_DATA_API_KEY=your_market_data_api_key
 ```
 
-Free market data APIs can have rate limits, delayed data, symbol coverage differences, and daily request limits. The cache layer simulates real-world rate-limit and resilience handling: the UI can feel live without forcing the backend to call the external provider every 5 seconds. If the provider is unavailable while refreshing existing trades, the app keeps the previously stored market price and logs a warning.
+Free market data APIs can have rate limits, delayed data, symbol coverage differences, and daily request limits. The cache layer simulates real-world rate-limit and resilience handling: users can refresh prices when needed without forcing the backend to call the external provider unnecessarily. If the provider is unavailable while refreshing existing trades, the app keeps the previously stored market price and logs a warning.
 
 The Market Overview simulates a simplified market watchlist found in financial platforms. It supports market data monitoring alongside trade lifecycle management and P&L tracking.
 

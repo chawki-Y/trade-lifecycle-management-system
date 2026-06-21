@@ -1,5 +1,6 @@
 const tradeForm = document.querySelector("#tradeForm");
 const refreshButton = document.querySelector("#refreshButton");
+const refreshMarketPriceButton = document.querySelector("#refreshMarketPriceButton");
 const refreshMarketOverviewButton = document.querySelector("#refreshMarketOverviewButton");
 const formMessage = document.querySelector("#formMessage");
 const tradesTable = document.querySelector("#tradesTable");
@@ -15,7 +16,6 @@ const marketPriceCheckedAt = document.querySelector("#marketPriceCheckedAt");
 const marketPriceStatus = document.querySelector("#marketPriceStatus");
 let instrumentsLoaded = false;
 let latestMarketPrice = null;
-let marketPriceTimer = null;
 
 const metricEls = {
   totalTrades: document.querySelector("#totalTrades"),
@@ -176,6 +176,7 @@ async function loadInstruments() {
 }
 
 async function loadMarketPrice(symbol) {
+  refreshMarketPriceButton.disabled = true;
   setMarketPriceState({
     symbol,
     price: latestMarketPrice,
@@ -184,58 +185,32 @@ async function loadMarketPrice(symbol) {
     status: "Loading..."
   });
 
-  const marketData = await fetchJson(`/api/market-price/${encodeURIComponent(symbol)}`);
-  latestMarketPrice = marketData.marketPrice;
-
-  setMarketPriceState({
-    symbol: marketData.symbol,
-    price: marketData.marketPrice,
-    timestamp: marketData.timestamp,
-    checkedAt: marketData.checkedAt,
-    status: marketData.fromCache ? "Price source: Cache" : "Price source: API"
-  });
-}
-
-function stopMarketPriceRefresh() {
-  if (marketPriceTimer) {
-    clearInterval(marketPriceTimer);
-    marketPriceTimer = null;
-  }
-}
-
-async function startMarketPriceRefresh(symbol) {
-  stopMarketPriceRefresh();
-  latestMarketPrice = null;
-  submitButton.disabled = true;
-
   try {
-    await loadMarketPrice(symbol);
+    const marketData = await fetchJson(`/api/market-price/${encodeURIComponent(symbol)}`);
+    latestMarketPrice = marketData.marketPrice;
+
+    setMarketPriceState({
+      symbol: marketData.symbol,
+      price: marketData.marketPrice,
+      timestamp: marketData.timestamp,
+      checkedAt: marketData.checkedAt,
+      status: marketData.fromCache ? "Price source: Cache" : "Price source: API"
+    });
+
     submitButton.disabled = false;
+    refreshMarketPriceButton.disabled = false;
     setMessage("");
   } catch (error) {
     latestMarketPrice = null;
     submitButton.disabled = true;
+    refreshMarketPriceButton.disabled = !instrumentSelect.value;
     setMarketPriceState({
       symbol,
       checkedAt: new Date().toISOString(),
       status: "Market price unavailable"
     });
     setMessage("Market price is unavailable. Please try again later.", "error");
-    return;
   }
-
-  marketPriceTimer = setInterval(async () => {
-    try {
-      await loadMarketPrice(symbol);
-    } catch (error) {
-      setMarketPriceState({
-        symbol,
-        price: latestMarketPrice,
-        checkedAt: new Date().toISOString(),
-        status: "Using last available price"
-      });
-    }
-  }, 5000);
 }
 
 async function loadTrades() {
@@ -267,6 +242,11 @@ async function loadTrades() {
 
 async function refreshDashboard() {
   await loadMarketOverview();
+  await loadTrades();
+  await loadReport();
+}
+
+async function refreshTradePnl() {
   await loadTrades();
   await loadReport();
 }
@@ -312,9 +292,9 @@ tradeForm.addEventListener("submit", async (event) => {
     setMessage(resultMessage, result.status === "VALID" ? "success" : "error");
     tradeForm.reset();
     document.querySelector("#tradeDate").valueAsDate = new Date();
-    stopMarketPriceRefresh();
     latestMarketPrice = null;
     submitButton.disabled = true;
+    refreshMarketPriceButton.disabled = true;
     setMarketPriceState({ status: "Select an instrument" });
     await refreshDashboard();
   } catch (error) {
@@ -323,13 +303,22 @@ tradeForm.addEventListener("submit", async (event) => {
 });
 
 refreshButton.addEventListener("click", async () => {
-  setMessage("Refreshing...");
+  setMessage("Refreshing trade P&L...");
   try {
-    await refreshDashboard();
-    setMessage("Dashboard refreshed.", "success");
+    await refreshTradePnl();
+    setMessage("Trade P&L refreshed.", "success");
   } catch (error) {
     setMessage(error.message, "error");
   }
+});
+
+refreshMarketPriceButton.addEventListener("click", async () => {
+  if (!instrumentSelect.value) {
+    setMessage("Please select an instrument first.", "error");
+    return;
+  }
+
+  await loadMarketPrice(instrumentSelect.value);
 });
 
 refreshMarketOverviewButton.addEventListener("click", async () => {
@@ -339,16 +328,17 @@ refreshMarketOverviewButton.addEventListener("click", async () => {
 instrumentSelect.addEventListener("change", async () => {
   const symbol = instrumentSelect.value;
 
-  stopMarketPriceRefresh();
   latestMarketPrice = null;
 
   if (!symbol) {
     submitButton.disabled = true;
+    refreshMarketPriceButton.disabled = true;
     setMarketPriceState({ status: "Select an instrument" });
     return;
   }
 
-  await startMarketPriceRefresh(symbol);
+  refreshMarketPriceButton.disabled = false;
+  await loadMarketPrice(symbol);
 });
 
 refreshDashboard().catch((error) => {

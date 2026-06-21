@@ -110,6 +110,12 @@ h2 {
   margin-bottom: 16px;
 }
 
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 #formMessage {
   color: var(--muted);
   font-size: 14px;
@@ -371,6 +377,12 @@ td {
   .section-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .section-actions {
+    align-items: stretch;
+    flex-direction: column;
+    width: 100%;
   }
 
   #formMessage {
