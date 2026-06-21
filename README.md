@@ -31,6 +31,69 @@ This project was built to demonstrate backend API development, SQL/database desi
 - Show reporting dashboard with total trades, booked trades, rejected trades, and total P&L
 - Responsive frontend for laptop and mobile
 
+- ## Screenshots
+
+### Dashboard Overview
+
+Shows the trade lifecycle dashboard with summary metrics, market data integration, and reporting.
+
+![Dashboard Overview](screenshots/dashboard-overview.png)
+
+---
+
+### Market Overview
+
+Displays all active instruments, latest market prices, asset classes, currencies, and market data source information.
+
+![Market Overview](screenshots/market-overview.png)
+
+---
+
+### Trade Capture
+
+Trade entry screen with instrument selection from PostgreSQL reference data, trade details, and automated market price integration.
+
+![Trade Capture](screenshots/trade-capture.png)
+
+---
+
+### Latest Trades
+
+Trade book showing generated trade IDs, instrument information, P&L calculations, lifecycle status, and trade actions.
+
+![Latest Trades](screenshots/latest-trades.png)
+
+---
+
+### Trade Detail View
+
+Detailed trade information accessible from the Latest Trades table.
+
+Includes:
+
+* Trade ID
+* Instrument
+* Trade Type
+* Quantity
+* Trade Price
+* Market Price
+* P&L
+* Status
+* Market Data Source
+* Trade Date
+* Created Date
+
+![Trade Detail View](screenshots/trade-detail-view.png)
+
+---
+
+### Audit Trail
+
+Operational event tracking and audit history for trade processing, market data refreshes, and P&L recalculations.
+
+![Audit Trail](screenshots/audit-trail.png)
+
+
 ## Tech Stack
 
 - Node.js
