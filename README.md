@@ -83,6 +83,7 @@ Example:
   "marketPrice": 185.22,
   "source": "twelvedata",
   "timestamp": "2026-06-21T12:00:00.000Z",
+  "checkedAt": "2026-06-21T12:00:05.000Z",
   "fromCache": false,
   "stale": false
 }
@@ -107,6 +108,7 @@ Cache behavior:
 - Stocks and crypto use a 60-second cache.
 - FX pairs and commodities use a 120-second cache.
 - The frontend can refresh every 5 seconds, but repeated backend requests reuse cached prices while the cache is valid.
+- `timestamp` shows when the quote was last fetched from the provider. `checkedAt` shows when the backend last checked for a price, so it changes on every frontend refresh even when the quote comes from cache.
 - If the provider fails and a stale cached price exists, the backend returns the stale cached price instead of crashing.
 - When refreshing the trades table, the backend fetches one price per unique instrument and reuses it for all trades with that instrument.
 

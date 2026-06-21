@@ -8,6 +8,7 @@ const submitButton = tradeForm.querySelector("button[type='submit']");
 const selectedInstrumentLabel = document.querySelector("#selectedInstrumentLabel");
 const marketPriceValue = document.querySelector("#marketPriceValue");
 const marketPriceUpdatedAt = document.querySelector("#marketPriceUpdatedAt");
+const marketPriceCheckedAt = document.querySelector("#marketPriceCheckedAt");
 const marketPriceStatus = document.querySelector("#marketPriceStatus");
 let instrumentsLoaded = false;
 let latestMarketPrice = null;
@@ -60,10 +61,11 @@ function formatTime(value) {
   return new Date(value).toLocaleTimeString();
 }
 
-function setMarketPriceState({ symbol = "-", price = null, timestamp = null, status = "" }) {
+function setMarketPriceState({ symbol = "-", price = null, timestamp = null, checkedAt = null, status = "" }) {
   selectedInstrumentLabel.textContent = symbol;
   marketPriceValue.textContent = price === null ? "-" : formatMarketPrice(price);
   marketPriceUpdatedAt.textContent = formatTime(timestamp);
+  marketPriceCheckedAt.textContent = formatTime(checkedAt);
   marketPriceStatus.textContent = status;
 }
 
@@ -119,6 +121,7 @@ async function loadMarketPrice(symbol) {
     symbol,
     price: latestMarketPrice,
     timestamp: null,
+    checkedAt: new Date().toISOString(),
     status: "Loading..."
   });
 
@@ -129,6 +132,7 @@ async function loadMarketPrice(symbol) {
     symbol: marketData.symbol,
     price: marketData.marketPrice,
     timestamp: marketData.timestamp,
+    checkedAt: marketData.checkedAt,
     status: marketData.fromCache ? "Price source: Cache" : "Price source: API"
   });
 }
@@ -154,6 +158,7 @@ async function startMarketPriceRefresh(symbol) {
     submitButton.disabled = true;
     setMarketPriceState({
       symbol,
+      checkedAt: new Date().toISOString(),
       status: "Market price unavailable"
     });
     setMessage("Market price is unavailable. Please try again later.", "error");
@@ -167,6 +172,7 @@ async function startMarketPriceRefresh(symbol) {
       setMarketPriceState({
         symbol,
         price: latestMarketPrice,
+        checkedAt: new Date().toISOString(),
         status: "Using last available price"
       });
     }
