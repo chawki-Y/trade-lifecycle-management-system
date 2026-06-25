@@ -420,6 +420,25 @@ MARKET_DATA_API_KEY=your_market_data_api_key
 MARKET_DATA_STALE_THRESHOLD_MINUTES=15
 ```
 
+Market data fallback flow:
+
+```mermaid
+flowchart TD
+    A["User refreshes market price"] --> B["MarketDataService"]
+    B --> C{"Valid memory cache?"}
+    C -- "Yes" --> D["Return cached price"]
+    C -- "No" --> E["Call Twelve Data API"]
+    E --> F{"API success?"}
+    F -- "Yes" --> G["Save to memory cache"]
+    G --> H["Upsert latest price into PostgreSQL"]
+    H --> I["Return fresh API price"]
+    F -- "No" --> J{"Stale memory cache available?"}
+    J -- "Yes" --> K["Return stale cached price"]
+    J -- "No" --> L{"Latest database price available?"}
+    L -- "Yes" --> M["Return database fallback price marked stale"]
+    L -- "No" --> N["Return unavailable error"]
+```
+
 Free market data APIs can have rate limits, delayed data, symbol coverage differences, and daily request limits. The cache and persistence layers simulate real-world rate-limit and resilience handling: users can refresh prices when needed without forcing the backend to call the external provider unnecessarily. If the provider is unavailable, the app can still show the latest known database price marked as stale.
 
 The Market Overview simulates a simplified market watchlist found in financial platforms. It supports market data monitoring alongside trade operations management and P&L tracking. It shows market price, data source, freshness label, and data status such as API, Cache, Database fallback, Stale, or Unavailable.
