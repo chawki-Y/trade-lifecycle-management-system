@@ -1,6 +1,6 @@
 const { pool } = require("../config/db");
 
-const STALE_MARKET_DATA_MINUTES = 15;
+const STALE_MARKET_DATA_MINUTES = Number(process.env.MARKET_DATA_STALE_THRESHOLD_MINUTES) || 15;
 
 function formatTimeAgo(timestamp) {
   if (!timestamp) {
@@ -95,22 +95,26 @@ async function getOperationalSummary(req, res) {
       `),
       pool.query(
         `
-          SELECT COUNT(DISTINCT instrument)::INT AS "staleMarketDataCount"
-          FROM trades
-          WHERE status = 'BOOKED'
-            AND last_price_updated_at IS NOT NULL
-            AND last_price_updated_at < NOW() - ($1::TEXT)::INTERVAL
+          SELECT COUNT(*)::INT AS "staleMarketDataCount"
+          FROM instruments i
+          JOIN market_prices mp ON mp.symbol = i.symbol
+          WHERE i.is_active = TRUE
+            AND (
+              mp.stale = TRUE
+              OR COALESCE(mp.provider_timestamp, mp.last_checked_at) < NOW() - ($1::TEXT)::INTERVAL
+            )
         `,
         [`${STALE_MARKET_DATA_MINUTES} minutes`]
       ),
       pool.query(`
-        SELECT COUNT(DISTINCT instrument)::INT AS "unavailableMarketDataCount"
-        FROM trades
-        WHERE status = 'BOOKED'
+        SELECT COUNT(*)::INT AS "unavailableMarketDataCount"
+        FROM instruments i
+        LEFT JOIN market_prices mp ON mp.symbol = i.symbol
+        WHERE i.is_active = TRUE
           AND (
-            last_price_updated_at IS NULL
-            OR market_data_source IS NULL
-            OR market_data_source = 'Unavailable'
+            mp.symbol IS NULL
+            OR mp.source IS NULL
+            OR mp.source = 'Unavailable'
           )
       `),
       pool.query(`

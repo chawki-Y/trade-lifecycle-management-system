@@ -24,10 +24,14 @@ async function buildMarketOverviewRow(instrument) {
       currency: instrument.currency,
       marketPrice: marketData.marketPrice,
       lastUpdated: marketData.timestamp,
+      lastCheckedAt: marketData.lastCheckedAt,
       source: marketData.source,
       fromCache: marketData.fromCache,
+      fromDatabase: marketData.fromDatabase,
       cacheAgeSeconds: marketData.cacheAgeSeconds,
-      stale: marketData.stale || false
+      stale: marketData.stale || false,
+      priceAgeSeconds: marketData.priceAgeSeconds,
+      freshnessLabel: marketData.freshnessLabel
     };
   } catch (error) {
     await createAuditLog(
@@ -44,9 +48,13 @@ async function buildMarketOverviewRow(instrument) {
       currency: instrument.currency,
       marketPrice: null,
       lastUpdated: null,
+      lastCheckedAt: null,
       source: "Unavailable",
       fromCache: false,
+      fromDatabase: false,
       stale: false,
+      priceAgeSeconds: null,
+      freshnessLabel: "Never updated",
       error: error.message
     };
   }

@@ -79,7 +79,7 @@ async function refreshBookedTradesMarketPrices() {
         [
           marketData.marketPrice,
           pnl,
-          marketData.timestamp,
+          marketData.timestamp || marketData.lastCheckedAt,
           marketData.source,
           trade.id
         ]
@@ -216,7 +216,7 @@ async function createTrade(req, res) {
         storedTradeDate,
         status,
         rejectionReason,
-        marketData ? marketData.timestamp : null,
+        marketData ? marketData.timestamp || marketData.lastCheckedAt : null,
         marketData ? marketData.source : null
       ]
     );

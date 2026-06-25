@@ -340,7 +340,7 @@ table {
 }
 
 .market-overview-table {
-  min-width: 1040px;
+  min-width: 1160px;
 }
 
 .audit-table {
@@ -431,9 +431,30 @@ td {
   color: #92400e;
 }
 
+.source-pill.database {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.source-pill.stale {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
 .source-pill.unavailable {
   background: #fee4e2;
   color: #912018;
+}
+
+.market-row-stale {
+  background: #fffbeb;
+}
+
+.muted-inline {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
 }
 
 .empty-row {

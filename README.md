@@ -28,6 +28,7 @@ The goal is to simulate the type of support tool used by middle-office teams to 
 - View a Market Overview watchlist for all active instruments
 - Refresh selected instrument market price on demand
 - Refresh trade P&L and market prices on demand
+- Persist the latest known market price per instrument in PostgreSQL
 - Track simplified trade lifecycle statuses: NEW, VALIDATED, BOOKED, REJECTED
 - Store audit logs for trade, market data, and P&L events
 - View full trade details from the Latest Trades table
@@ -37,7 +38,8 @@ The goal is to simulate the type of support tool used by middle-office teams to 
 - Validate submitted instruments against backend reference data
 - Calculate P&L for BUY and SELL trades
 - Recalculate booked trade P&L when trades are refreshed
-- Cache market prices for 60 seconds to reduce free API usage
+- Cache market prices in memory to reduce free API usage
+- Fall back to the latest persisted database price if the market data provider is unavailable
 - Store trade records in PostgreSQL
 - Display trade history
 - Show reporting dashboard with total trades, booked trades, rejected trades, and total P&L
@@ -119,6 +121,7 @@ DB_DATABASE=trade_processing_db
 DB_PORT=5432
 MARKET_DATA_PROVIDER=twelvedata
 MARKET_DATA_API_KEY=your_market_data_api_key
+MARKET_DATA_STALE_THRESHOLD_MINUTES=15
 ```
 
 5. Start the app:
@@ -207,8 +210,12 @@ Example:
   "source": "twelvedata",
   "timestamp": "2026-06-21T12:00:00.000Z",
   "checkedAt": "2026-06-21T12:00:05.000Z",
+  "lastCheckedAt": "2026-06-21T12:00:05.000Z",
+  "priceAgeSeconds": 0,
+  "freshnessLabel": "Updated 0s ago",
   "cacheAgeSeconds": 0,
   "fromCache": false,
+  "fromDatabase": false,
   "stale": false
 }
 ```
@@ -217,7 +224,7 @@ Example:
 
 Returns the latest available market prices for all active instruments.
 
-The endpoint loads instruments from PostgreSQL, retrieves prices through the market data service, and uses the server-side cache when prices are still valid.
+The endpoint loads instruments from PostgreSQL, retrieves prices through the market data service, uses the server-side cache when prices are still valid, and can fall back to the latest persisted `market_prices` row if the external provider is unavailable.
 
 Example:
 
@@ -230,9 +237,13 @@ Example:
     "currency": "USD",
     "marketPrice": 185.22,
     "lastUpdated": "2026-06-21T12:45:03.000Z",
+    "lastCheckedAt": "2026-06-21T12:45:05.000Z",
     "source": "twelvedata",
     "fromCache": true,
+    "fromDatabase": false,
     "cacheAgeSeconds": 43,
+    "priceAgeSeconds": 43,
+    "freshnessLabel": "Updated 43s ago",
     "stale": false
   }
 ]
@@ -308,7 +319,7 @@ It shows:
 - Latest audit event time
 - Alert badges marked as info, warning, or danger
 
-Market data is treated as stale when a booked trade's last market price update is older than the operational freshness threshold used by the backend.
+Market data is treated as stale when the persisted latest price in `market_prices` is older than the operational freshness threshold used by the backend.
 
 ## Trade Investigation
 
@@ -383,18 +394,22 @@ The dashboard behaves like a simplified trading workstation:
 - When a trade is submitted, the backend fetches the latest available market price and uses it to calculate P&L.
 - When `GET /api/trades` is called, booked trades attempt to refresh their market price and recalculate P&L.
 
-Market prices are cached server-side to reduce free API usage and avoid unnecessary provider calls.
+Market prices are cached server-side and persisted in PostgreSQL to reduce free API usage, survive backend restarts, and avoid blank dashboards when the external provider is unavailable.
 
-## Market Data Cache
+## Market Data Cache And Persistence
 
-Cache behavior:
+Cache and persistence behavior:
 
 - Stocks and crypto use a 60-second cache.
 - FX pairs and commodities use a 120-second cache.
 - Price refreshes are user-triggered, and repeated backend requests reuse cached prices while the cache is valid.
 - `timestamp` shows when the quote was last fetched from the provider. `checkedAt` shows when the backend last checked for a price, so it changes on every frontend refresh even when the quote comes from cache.
 - `cacheAgeSeconds` shows how old a cached price is, which gives users transparency when a price comes from cache.
-- If the provider fails and a stale cached price exists, the backend returns the stale cached price instead of crashing.
+- Fresh provider prices are upserted into the `market_prices` table, one row per instrument.
+- If the provider fails and a stale in-memory cached price exists, the backend returns the stale cached price instead of crashing.
+- If the provider fails and no memory cache exists, the backend tries the latest known PostgreSQL price from `market_prices`.
+- Database fallback prices are marked as stale and shown as `Database fallback` in Market Overview.
+- The app does not store every market tick. It only stores the latest known price per instrument.
 - When refreshing the trades table, the backend fetches one price per unique instrument and reuses it for all trades with that instrument.
 
 Configure market data in `.env`:
@@ -402,11 +417,12 @@ Configure market data in `.env`:
 ```env
 MARKET_DATA_PROVIDER=twelvedata
 MARKET_DATA_API_KEY=your_market_data_api_key
+MARKET_DATA_STALE_THRESHOLD_MINUTES=15
 ```
 
-Free market data APIs can have rate limits, delayed data, symbol coverage differences, and daily request limits. The cache layer simulates real-world rate-limit and resilience handling: users can refresh prices when needed without forcing the backend to call the external provider unnecessarily. If the provider is unavailable while refreshing existing trades, the app keeps the previously stored market price and logs a warning.
+Free market data APIs can have rate limits, delayed data, symbol coverage differences, and daily request limits. The cache and persistence layers simulate real-world rate-limit and resilience handling: users can refresh prices when needed without forcing the backend to call the external provider unnecessarily. If the provider is unavailable, the app can still show the latest known database price marked as stale.
 
-The Market Overview simulates a simplified market watchlist found in financial platforms. It supports market data monitoring alongside trade lifecycle management and P&L tracking.
+The Market Overview simulates a simplified market watchlist found in financial platforms. It supports market data monitoring alongside trade operations management and P&L tracking. It shows market price, data source, freshness label, and data status such as API, Cache, Database fallback, Stale, or Unavailable.
 
 ## Screenshot Recommendations
 

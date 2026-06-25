@@ -119,6 +119,29 @@ function formatCacheAge(ageSeconds) {
   return ` Age: ${age}s`;
 }
 
+function getMarketDataStatus(instrument) {
+  if (instrument.marketPrice === null) {
+    return { label: "Unavailable", className: "unavailable" };
+  }
+
+  if (instrument.stale) {
+    return {
+      label: instrument.fromDatabase ? "Database fallback" : "Stale",
+      className: "stale"
+    };
+  }
+
+  if (instrument.fromDatabase) {
+    return { label: "Database fallback", className: "database" };
+  }
+
+  if (instrument.fromCache) {
+    return { label: "Cache", className: "cache" };
+  }
+
+  return { label: "API", className: "api" };
+}
+
 function setMarketPriceState({ symbol = "-", price = null, timestamp = null, checkedAt = null, status = "" }) {
   selectedInstrumentLabel.textContent = symbol;
   marketPriceValue.textContent = price === null ? "-" : formatMarketPrice(price);
@@ -191,30 +214,30 @@ async function loadMarketOverview() {
     const overview = await fetchJson("/api/market-overview");
 
     if (!overview.length) {
-      marketOverviewTable.innerHTML = `<tr><td class="empty-row" colspan="7">No active instruments available.</td></tr>`;
+      marketOverviewTable.innerHTML = `<tr><td class="empty-row" colspan="8">No active instruments available.</td></tr>`;
       marketOverviewStatus.textContent = "No active instruments";
       return;
     }
 
     marketOverviewTable.innerHTML = overview.map((instrument) => {
-      const sourceLabel = instrument.marketPrice === null ? "Unavailable" : instrument.fromCache ? "Cache" : "API";
-      const sourceClass = instrument.marketPrice === null ? "unavailable" : instrument.fromCache ? "cache" : "api";
-      const cacheAge = instrument.fromCache ? formatCacheAge(instrument.cacheAgeSeconds) : "";
+      const status = getMarketDataStatus(instrument);
       const price = instrument.marketPrice === null ? "Unavailable" : formatMarketPrice(instrument.marketPrice);
-      const updatedAt = formatTime(instrument.lastUpdated);
+      const freshnessLabel = instrument.freshnessLabel || "Never updated";
+      const rowClass = instrument.stale ? "market-row-stale" : "";
 
       return `
-        <tr>
+        <tr class="${rowClass}">
           <td><strong>${instrument.symbol}</strong></td>
           <td>${instrument.name}</td>
           <td>${instrument.assetClass}</td>
           <td>${instrument.currency || "-"}</td>
           <td>${price}</td>
-          <td>${updatedAt}</td>
+          <td>${formatSource(instrument.source)}</td>
           <td>
-            <span>${formatSource(instrument.source)}</span>
-            <span class="source-pill ${sourceClass}">Source: ${sourceLabel}${cacheAge}</span>
+            <span>${freshnessLabel}</span>
+            <span class="muted-inline">Checked: ${formatTime(instrument.lastCheckedAt)}</span>
           </td>
+          <td><span class="source-pill ${status.className}">${status.label}</span></td>
         </tr>
       `;
     }).join("");
@@ -222,7 +245,7 @@ async function loadMarketOverview() {
     marketOverviewStatus.textContent = `Updated ${overview.length} instruments`;
   } catch (error) {
     marketOverviewStatus.textContent = "Market overview unavailable";
-    marketOverviewTable.innerHTML = `<tr><td class="empty-row" colspan="7">${error.message}</td></tr>`;
+    marketOverviewTable.innerHTML = `<tr><td class="empty-row" colspan="8">${error.message}</td></tr>`;
   } finally {
     refreshMarketOverviewButton.disabled = false;
   }
@@ -308,7 +331,9 @@ async function loadMarketPrice(symbol) {
       checkedAt: marketData.checkedAt,
       status: marketData.fromCache
         ? `Price source: Cache${formatCacheAge(marketData.cacheAgeSeconds)}`
-        : "Price source: API"
+        : marketData.fromDatabase
+          ? `Price source: Database fallback - ${marketData.freshnessLabel || "stale"}`
+          : "Price source: API"
     });
 
     submitButton.disabled = false;

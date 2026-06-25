@@ -32,21 +32,18 @@ async function getMarketPrice(req, res) {
 
     const marketData = await getLatestMarketPrice(symbol);
 
-    await createAuditLog(
-      "MARKET_PRICE_REFRESHED",
-      "INSTRUMENT",
-      symbol,
-      `Market price checked for ${symbol} using ${marketData.fromCache ? "cache" : "API"}.`
-    );
-
     return res.json({
       symbol: marketData.symbol,
       marketPrice: marketData.marketPrice,
       source: marketData.source,
       timestamp: marketData.timestamp,
-      checkedAt: new Date().toISOString(),
+      checkedAt: marketData.lastCheckedAt || new Date().toISOString(),
+      lastCheckedAt: marketData.lastCheckedAt,
+      priceAgeSeconds: marketData.priceAgeSeconds,
+      freshnessLabel: marketData.freshnessLabel,
       cacheAgeSeconds: marketData.cacheAgeSeconds,
       fromCache: marketData.fromCache,
+      fromDatabase: marketData.fromDatabase,
       stale: marketData.stale
     });
   } catch (error) {
