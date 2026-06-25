@@ -405,7 +405,7 @@ Cache and persistence behavior:
 - Price refreshes are user-triggered, and repeated backend requests reuse cached prices while the cache is valid.
 - `timestamp` shows when the quote was last fetched from the provider. `checkedAt` shows when the backend last checked for a price, so it changes on every frontend refresh even when the quote comes from cache.
 - `cacheAgeSeconds` shows how old a cached price is, which gives users transparency when a price comes from cache.
-- Fresh provider prices are upserted into the `market_prices` table, one row per instrument.
+- Fresh provider prices are updated/inserted into the `market_prices` table, one row per instrument.
 - If the provider fails and a stale in-memory cached price exists, the backend returns the stale cached price instead of crashing.
 - If the provider fails and no memory cache exists, the backend tries the latest known PostgreSQL price from `market_prices`.
 - Database fallback prices are marked as stale and shown as `Database fallback` in Market Overview.
@@ -430,7 +430,7 @@ flowchart TD
     C -- "No, expired or missing" --> E["Call Twelve Data API"]
     E --> F{"API success?"}
     F -- "Yes" --> G["Save to memory cache"]
-    G --> H["Upsert latest price into PostgreSQL"]
+    G --> H["Update/Insert latest price into PostgreSQL"]
     H --> I["Return fresh API price"]
     F -- "No" --> J{"Stale memory cache available?"}
     J -- "Yes" --> K["Return stale cached price"]
