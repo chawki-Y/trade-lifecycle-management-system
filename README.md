@@ -425,9 +425,9 @@ Market data fallback flow:
 ```mermaid
 flowchart TD
     A["User refreshes market price"] --> B["MarketDataService"]
-    B --> C{"Valid memory cache?"}
-    C -- "Yes" --> D["Return cached price"]
-    C -- "No" --> E["Call Twelve Data API"]
+    B --> C{"Memory cache still valid?"}
+    C -- "Yes, within TTL" --> D["Return cached price"]
+    C -- "No, expired or missing" --> E["Call Twelve Data API"]
     E --> F{"API success?"}
     F -- "Yes" --> G["Save to memory cache"]
     G --> H["Upsert latest price into PostgreSQL"]
