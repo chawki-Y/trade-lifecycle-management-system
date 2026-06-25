@@ -1,12 +1,12 @@
-# Trade Operations Monitoring Dashboard
+# Trade Operations Management System
 
-A full-stack mini trade operations monitoring dashboard that simulates a simplified capital markets middle-office workflow.
+A full-stack mini trade operations management system that simulates a simplified capital markets middle-office workflow.
 
 The application allows users to monitor daily trade activity, identify rejected trades, detect stale market data, review operational alerts, investigate trade issues, and track P&L from a simple dashboard.
 
 ## Purpose
 
-This project simulates a trade operations monitoring dashboard used by middle-office or support analysts to monitor booked/rejected trades, market data health, P&L, and audit events.
+This project simulates a trade operations management system used by middle-office or support analysts to monitor booked/rejected trades, market data health, P&L, and audit events.
 
 It was built to demonstrate backend API development, SQL/database design, business rule validation, financial calculation logic, market data monitoring, auditability, and operational reporting - concepts commonly found in banking, capital markets, ERP, and financial technology systems.
 
@@ -435,7 +435,7 @@ SELL:
 ## Project Structure
 
 ```text
-trade-operations-monitoring-dashboard/
+trade-operations-management-system/
 |-- screenshots/
 |   |-- audit-trail.png
 |   |-- dashboard-overview.png

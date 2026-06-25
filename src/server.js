@@ -23,7 +23,7 @@ app.get("/", (req, res) => {
 });
 
 app.get("/api/health", (req, res) => {
-  res.json({ message: "Trade Operations Monitoring Dashboard API is running" });
+  res.json({ message: "Trade Operations Management System API is running" });
 });
 
 app.use("/api/trades", tradeRoutes);
@@ -34,5 +34,5 @@ app.use("/api/audit-logs", auditLogRoutes);
 app.use("/api/operations", operationsRoutes);
 
 app.listen(PORT, () => {
-  console.log(`Trade Operations Monitoring Dashboard API listening on port ${PORT}`);
+  console.log(`Trade Operations Management System API listening on port ${PORT}`);
 });

@@ -1,4 +1,4 @@
-# Trade Lifecycle Management System: Code Explanation
+# Trade Operations Management System: Code Explanation
 
 This document explains the project as if you built it and need to defend every technical decision. It focuses on the human-written project files. Generated files like `package-lock.json` and binary screenshot files are explained by purpose because they are not application logic.
 
@@ -21,7 +21,7 @@ PostgreSQL stores instruments, trades, and audit logs. The `database.sql` file c
 Starts the JSON object that defines the Node.js project metadata.
 
 ```json
-  "name": "trade-lifecycle-management-system",
+  "name": "trade-operations-management-system",
 ```
 
 Defines the npm package name. This was renamed from the earlier trade-processing name so the project identity matches the current app.
@@ -33,7 +33,7 @@ Defines the npm package name. This was renamed from the earlier trade-processing
 Sets the project version.
 
 ```json
-  "description": "Mini financial trade lifecycle management system using Node.js, Express, and PostgreSQL.",
+  "description": "Mini trade operations management system using Node.js, Express, and PostgreSQL.",
 ```
 
 Describes the project for npm/GitHub readers.
@@ -202,7 +202,7 @@ Serves the dashboard page at `/`.
 
 ```js
 app.get("/api/health", (req, res) => {
-  res.json({ message: "Trade Lifecycle Management System API is running" });
+  res.json({ message: "Trade Operations Management System API is running" });
 });
 ```
 
@@ -226,7 +226,7 @@ Mounts route groups:
 
 ```js
 app.listen(PORT, () => {
-  console.log(`Trade Lifecycle Management System API listening on port ${PORT}`);
+  console.log(`Trade Operations Management System API listening on port ${PORT}`);
 });
 ```
 
@@ -1013,9 +1013,8 @@ This is the file you are reading now. It is meant to help you explain the actual
 
 If an interviewer asks what you built, say:
 
-> I built a simplified trade lifecycle management system. The frontend lets users monitor market prices, select reference-data instruments, capture trades, view booked/rejected trades, inspect trade details, and review audit logs. The Express backend validates input, checks instruments against PostgreSQL, fetches market data through a cached service, calculates BUY/SELL P&L, stores trades, and exposes reporting APIs.
+> I built a simplified trade operations management system. The frontend lets users monitor market prices, select reference-data instruments, capture trades, view booked/rejected trades, inspect trade details, and review audit logs. The Express backend validates input, checks instruments against PostgreSQL, fetches market data through a cached service, calculates BUY/SELL P&L, stores trades, and exposes reporting APIs.
 
 If they ask why the project is more than CRUD:
 
 > It includes financial-system concepts: reference data, trade lifecycle status, audit logging, market data enrichment, cached provider integration, P&L calculation, rejected trade handling, reporting, and trade detail investigation.
-
