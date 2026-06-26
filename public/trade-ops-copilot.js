@@ -158,6 +158,35 @@
       color: #9f1239;
     }
 
+    .tocopilot-intent {
+      display: inline-flex;
+      width: fit-content;
+      margin-top: 8px;
+      border: 1px solid #d8dde3;
+      border-radius: 999px;
+      background: #f8fafc;
+      color: #667085;
+      padding: 3px 7px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .tocopilot-sql {
+      max-width: 100%;
+      margin-top: 10px;
+      overflow-x: auto;
+      border: 1px solid #d8dde3;
+      border-radius: 8px;
+      background: #0f172a;
+      color: #bbf7d0;
+      padding: 10px;
+      font-size: 11px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+
     .tocopilot-samples {
       display: flex;
       flex-wrap: wrap;
@@ -343,14 +372,14 @@
     return [];
   }
 
-  function renderTable(data) {
-    const rows = normalizeRows(data).slice(0, 6);
+  function renderTable(payload) {
+    const rows = (payload?.rows?.length ? payload.rows : normalizeRows(payload?.data)).slice(0, 6);
 
     if (!rows.length || typeof rows[0] !== "object") {
       return "";
     }
 
-    const columns = Object.keys(rows[0]).slice(0, 6);
+    const columns = (payload?.columns?.length ? payload.columns : Object.keys(rows[0])).slice(0, 6);
     const body = rows
       .map((row) => {
         const fields = columns
@@ -397,9 +426,16 @@
   function createMessage({ role, text, type = "", payload = null }) {
     const wrapper = document.createElement("article");
     wrapper.className = `tocopilot-message ${role === "user" ? "user" : ""} ${type}`;
-    wrapper.innerHTML = `<div class="tocopilot-message-text">${escapeHtml(text)}</div>${
-      payload?.data ? renderTable(payload.data) : ""
-    }`;
+    const intentBadge =
+      payload?.intent && role !== "user"
+        ? `<div class="tocopilot-intent">${escapeHtml(payload.intent.replaceAll("_", " "))}</div>`
+        : "";
+    const sqlBlock = payload?.generatedSql
+      ? `<pre class="tocopilot-sql"><code>${escapeHtml(payload.generatedSql)}</code></pre>`
+      : "";
+    wrapper.innerHTML = `<div class="tocopilot-message-text">${escapeHtml(text)}</div>${intentBadge}${sqlBlock}${renderTable(
+      payload
+    )}`;
     return wrapper;
   }
 
@@ -422,7 +458,7 @@
     root.id = ROOT_ID;
     root.innerHTML = `
       <button class="tocopilot-button" type="button" aria-expanded="false">
-        <span class="tocopilot-button-icon">✦</span>
+        <span class="tocopilot-button-icon">AI</span>
         <span>${escapeHtml(options.buttonLabel || "Ask Copilot")}</span>
       </button>
       <section class="tocopilot-panel" role="dialog" aria-label="${escapeHtml(title)}">
