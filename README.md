@@ -595,3 +595,7 @@ trade-operations-management-system/
 - Database migrations
 - Position tracking by instrument
 - Deployment to a cloud environment
+
+## License
+
+This project is available under the [MIT License](LICENSE).
